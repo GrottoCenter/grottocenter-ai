@@ -1,143 +1,103 @@
+"""
+Application Streamlit principale mise à jour avec la nouvelle interface collection
+"""
+
 import streamlit as st
-import requests
 import os
 from dotenv import load_dotenv
-from typing import Optional
 
-# Charger les variables d'environnement
+# Chargement des variables d'environnement
 load_dotenv()
 
-# Configuration
+# Configuration de la page
+st.set_page_config(
+    page_title="Grottocenter AI Tools",
+    page_icon="🕳️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Configuration API
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
-class APIClient:
-    """Client pour communiquer avec l'API FastAPI"""
-    
-    def __init__(self, base_url: str):
-        self.base_url = base_url
-    
-    def upload_pdf(self, file) -> dict:
-        """Upload un fichier PDF via l'API"""
-        try:
-            files = {"file": (file.name, file, "application/pdf")}
-            response = requests.post(
-                f"{self.base_url}/pdf/upload",
-                files=files,
-                timeout=30
-            )
-            return response.json(), response.status_code
-        except requests.exceptions.RequestException as e:
-            return {"success": False, "error": f"Erreur de connexion: {str(e)}"}, 500
-    
-    def health_check(self) -> bool:
-        """Vérifie si l'API est accessible"""
-        try:
-            response = requests.get(f"{self.base_url}/health", timeout=5)
-            return response.status_code == 200
-        except:
-            return False
-
 def main():
-    """Application Streamlit principale"""
-    
-    # Configuration de la page
-    st.set_page_config(
-        page_title="Grottocenter AI Tools",
-        page_icon="🕳️",
-        layout="wide",
-        initial_sidebar_state="collapsed"
-    )
-    
-    # Titre principal
+    # Header principal
     st.title("🕳️ Grottocenter AI Tools")
     st.markdown("---")
-    
-    # Initialiser le client API
-    api_client = APIClient(API_BASE_URL)
-    
-    # Vérification de la connexion API
+
+    # Navigation
     with st.sidebar:
-        st.header("🔧 Status")
-        if api_client.health_check():
-            st.success("✅ API connectée")
-        else:
-            st.error("❌ API non accessible")
-            st.warning(f"Vérifiez que l'API est démarrée sur {API_BASE_URL}")
-    
-    # Interface principale
-    st.header("📄 Upload de PDF")
-    
-    # Upload de fichier
-    uploaded_file = st.file_uploader(
-        "Déposez votre fichier PDF ici",
-        type=["pdf"],
-        help="Taille maximale: 50MB"
-    )
-    
-    if uploaded_file is not None:
-        # Affichage des informations du fichier
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.info(f"📁 **Fichier:** {uploaded_file.name}")
-        
-        with col2:
-            file_size_mb = uploaded_file.size / (1024 * 1024)
-            st.info(f"📊 **Taille:** {file_size_mb:.2f} MB")
-        
-        # Bouton d'upload
-        if st.button("🚀 Uploader le PDF", type="primary"):
-            if not api_client.health_check():
-                st.error("❌ Impossible de se connecter à l'API")
-                return
-            
-            # Barre de progression
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            try:
-                status_text.text("⏳ Upload en cours...")
-                progress_bar.progress(50)
-                
-                # Upload via API
-                result, status_code = api_client.upload_pdf(uploaded_file)
-                progress_bar.progress(100)
-                
-                # Traitement de la réponse
-                if status_code == 200 and result.get("success"):
-                    st.success("✅ PDF uploadé avec succès !")
-                    
-                    # Affichage des détails
-                    with st.expander("📋 Détails", expanded=True):
-                        st.write(f"**Nom du fichier:** {result.get('filename')}")
-                        st.write(f"**Taille:** {result.get('file_size')} bytes")
-                        st.write(f"**Date d'upload:** {result.get('upload_time')}")
-                        
-                else:
-                    # Gestion des erreurs
-                    error_msg = result.get("error", "Erreur inconnue")
-                    st.error(f"❌ Erreur lors de l'upload: {error_msg}")
-                    
-            except Exception as e:
-                st.error(f"❌ Erreur inattendue: {str(e)}")
-            
-            finally:
-                progress_bar.empty()
-                status_text.empty()
-    
-    # Informations dans la sidebar
-    with st.sidebar:
-        st.header("ℹ️ Informations")
-        st.markdown("""
-        **Formats acceptés:** PDF uniquement
-        
-        **Taille max:** 50 MB
-        
-        **API:** FastAPI
-        """)
-        
-        st.header("🔗 Liens utiles")
-        st.markdown(f"[📚 Documentation API]({API_BASE_URL}/docs)")
+        st.header("📋 Navigation")
+
+        pages = {
+            "🏠 Accueil": "home",
+            "📝 Modifier Collection": "collection",
+            "📄 Traitement PDF": "pdf"
+        }
+
+        selected_page_display = st.radio(
+            "Choisir une page:",
+            list(pages.keys()),
+            index=0
+        )
+
+        selected_page = pages[selected_page_display]
+
+    # Contenu principal basé sur la page sélectionnée
+    if selected_page == "home":
+        show_home_page()
+    elif selected_page == "collection":
+        show_collection_page()
+    elif selected_page == "pdf":
+        show_pdf_page()
+
+def show_home_page():
+    """Page d'accueil mise à jour"""
+    st.header("🏠 Bienvenue sur Grottocenter AI Tools")
+
+    st.markdown("""
+    Cette application vous permet de :
+
+    ### 📝 Modification de Collections ⚡ **NOUVELLE INTERFACE**
+    - **Interface moderne** : Modification intuitive avec détection automatique des changements
+    - **Prévisualisation** : Voir les modifications avant de les appliquer
+    - **Pipeline optimisé** : Charger → Modifier → Prévisualiser → Appliquer → Valider
+    - **Feedback visuel** : Indicateurs de changements et statut en temps réel
+
+    ### 📄 Traitement PDF
+    - **Upload et validation** : Télécharger des documents PDF avec validation automatique
+    - **Division intelligente** : Séparer les revues PDF en articles individuels (à venir)
+    - **Extraction métadonnées** : Récupérer automatiquement les informations (à venir)
+
+    ### 🚀 Nouveau workflow de modification
+    1. **🔍 Rechercher** : Entrez l'ID de la collection
+    2. **✏️ Modifier** : Changez les champs directement (sans checkboxes !)
+    3. **👁️ Prévisualiser** : Voyez vos modifications avant/après
+    4. **✅ Appliquer** : Envoyez les changements à Grottocenter
+    5. **📝 Valider** : Finalisez la modification
+    6. **🔗 Accéder** : Lien direct vers votre collection mise à jour
+    """)
+
+def show_collection_page():
+    """Page de modification des collections"""
+    try:
+        from pages.collection_editor import show_collection_editor
+        show_collection_editor(API_BASE_URL)
+    except ImportError as e:
+        st.error("❌ **Erreur d'import du module collection_editor**")
+        st.exception(e)
+    except Exception as e:
+        st.error("❌ **Erreur lors du chargement de la page de collection**")
+        st.exception(e)
+
+def show_pdf_page():
+    st.header("📄 Traitement des documents PDF")
+    try:
+        from pages.pdf_processing import show_pdf_processing_page
+        show_pdf_processing_page(API_BASE_URL)
+    except Exception as e:
+        st.error("❌ Impossible de charger le module PDF")
+        st.exception(e)
 
 if __name__ == "__main__":
     main()
