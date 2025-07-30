@@ -78,9 +78,11 @@ class CollectionEditor:
             "pages": doc.get("pages", ""),
             "creatorComment": doc.get("creatorComment", ""),
             "mainLanguage": doc.get("mainLanguage", ""),
-            "license": doc.get("license", ""),  # déjà une string
-            "identifierType": doc.get("identifierType", ""),
-            "iso3166": ";".join([entry.get("iso", "") for entry in doc.get("iso3166", [])])
+            "license": doc.get("license", ""),  # string
+            "identifierType": doc.get("identifierType", ""),  # string
+            "iso3166": ";".join([entry.get("iso", "") for entry in doc.get("iso3166", [])]),
+            "authorizationDocument": str(doc.get("authorizationDocument", {}).get("id", "")),
+            "editor": str(doc.get("editor", {}).get("id", ""))
         }
 
     def _show_form(self):
@@ -99,7 +101,8 @@ class CollectionEditor:
             ("license", "Licence", "select", self.license_options),
             ("identifierType", "Type d'identifiant", "select", self.identifier_type_options),
             ("iso3166", "Régions ISO", "text"),
-
+            ("authorizationDocument", "ID du document d'autorisation", "text"),
+            ("editor", "ID de l’éditeur", "text")
         ]
 
         for f in fields:
@@ -148,6 +151,15 @@ class CollectionEditor:
         iso_value = changed.get("iso3166", init.get("iso3166", ""))
         iso_list = [iso.strip() for iso in iso_value.split(";") if iso.strip()]
         payload["iso3166"] = [{"iso": iso} for iso in iso_list] if iso_list else []
+        
+        # AuthorizationDocument
+        auth_doc_id = changed.get("authorizationDocument", init.get("authorizationDocument", ""))
+        payload["authorizationDocument"] = {"id": int(auth_doc_id)} if auth_doc_id else None
+
+        # Editor
+        editor_id = changed.get("editor", init.get("editor", ""))
+        payload["editor"] = {"id": int(editor_id)} if editor_id else None
+
 
         try:
             res = requests.put(f"{self.api_base_url}/documents/{doc_id}/update-and-validate", json=payload)
