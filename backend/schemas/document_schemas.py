@@ -1,5 +1,7 @@
 from typing import Optional, List
 from pydantic import BaseModel
+from typing import Dict, Any, List
+
 
 class IdentifierTypeRef(BaseModel):
     id: str
@@ -28,3 +30,12 @@ class DocumentUpdateRequest(BaseModel):
     iso3166: Optional[List[Iso3166Item]] = None
     authorizationDocument: Optional[AuthorizationDocRef] = None
     editor: Optional[EditorRef] = None
+    
+class InheritanceRequest(BaseModel):
+    heritable_fields: Dict[str, Any]
+    child_ids: List[int]
+
+class InheritanceResult(BaseModel):
+    success: List[Dict[str, Any]]
+    errors: List[Dict[str, Any]]
+    total: int
