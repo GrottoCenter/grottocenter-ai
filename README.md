@@ -15,12 +15,14 @@ Serveur d'outils IA pour automatiser le traitement des documents PDF de Grottoce
 
 ## 🎯 Objectifs
 
-Ce projet vise à automatiser le traitement des documents PDF pour Grottocenter :
+Ce projet vise à automatiser le traitement des documents PDF et la gestion des collections pour Grottocenter :
 
 1. **Division automatique** : Séparer les revues PDF en articles individuels
 2. **Extraction de métadonnées** : Récupérer automatiquement les informations (titre, auteur, date, etc.)
-3. **Intégration Grottocenter** : Créer/mettre à jour les documents via l'API Grottocenter
-4. **Interface utilisateur** : Simplifier les opérations pour les utilisateurs finaux
+3. **Intégration Grottocenter** : Connexion complète à l'API Grottocenter pour créer/mettre à jour les documents
+4. **Gestion des collections** : Interface web pour éditer les propriétés des documents et collections
+5. **Héritage de propriétés** : Appliquer automatiquement les propriétés d'une collection parent à ses documents descendants
+6. **Interface utilisateur** : Interfaces web spécialisées pour simplifier toutes les opérations
 
 ## 🏗️ Architecture
 
@@ -29,6 +31,10 @@ Ce projet vise à automatiser le traitement des documents PDF pour Grottocenter 
 │   Streamlit     │ ◄──────────────► │   FastAPI        │
 │   Frontend      │                 │   Backend        │
 │   (Port 8501)   │                 │   (Port 8000)    │
+│                 │                 │                  │
+│ • PDF Upload    │                 │ • PDF Routes     │
+│ • Doc Editor    │                 │ • Doc Routes     │
+│ • Inheritance   │                 │ • Services       │
 └─────────────────┘                 └──────────────────┘
                                              │
                                              ▼
@@ -42,7 +48,10 @@ Ce projet vise à automatiser le traitement des documents PDF pour Grottocenter 
                                              ▼
                                     ┌──────────────────┐
                                     │  Grottocenter    │
-                                    │  API Integration │
+                                    │  API Client      │
+                                    │  - CRUD Documents│
+                                    │  - Validation    │
+                                    │  - Inheritance   │
                                     └──────────────────┘
 ```
 
@@ -52,16 +61,31 @@ Ce projet vise à automatiser le traitement des documents PDF pour Grottocenter 
 AI-serveur-for-Grottocenter-documents/
 ├── backend/                    # Serveur FastAPI
 │   ├── api/                   # Routes API
-│   │   └── pdf_routes.py      # Endpoints PDF
+│   │   ├── pdf_routes.py      # Endpoints PDF
+│   │   └── document_routes.py # Endpoints documents Grottocenter
+│   ├── client/                # Client API Grottocenter
+│   │   ├── base_client.py     # Client HTTP asynchrone
+│   │   └── exceptions.py      # Exceptions API
 │   ├── models/                # Modèles Pydantic
 │   │   └── pdf_models.py      # Modèles de données PDF
+│   ├── schemas/               # Schémas de données
+│   │   └── document_schemas.py # Schémas documents
 │   ├── services/              # Logique métier
-│   │   └── pdf_service.py     # Service de traitement PDF
+│   │   ├── pdf_service.py     # Service de traitement PDF
+│   │   └── document_service.py # Service documents Grottocenter
 │   ├── utils/                 # Utilitaires
-│   │   └── exceptions.py      # Exceptions personnalisées
+│   │   ├── exceptions.py      # Exceptions personnalisées
+│   │   └── csv_utils.py       # Utilitaires CSV
+│   ├── validators/            # Validateurs
 │   └── main.py               # Point d'entrée FastAPI
 ├── frontend/                  # Interface Streamlit
+│   ├── components/            # Composants UI
+│   │   ├── collection_editor.py    # Éditeur de documents
+│   │   ├── collection_inheritance.py # Héritage de propriétés
+│   │   └── pdf_processing.py       # Traitement PDF
 │   └── streamlit_app.py      # Application principale
+├── config/                    # Configuration
+│   └── collection_config.ini  # Config collections
 ├── uploads/                   # Stockage temporaire PDF
 ├── run_backend.py            # Script de lancement backend
 ├── run_frontend.py           # Script de lancement frontend
@@ -232,9 +256,9 @@ MAX_FILE_SIZE_MB=50
 STREAMLIT_PORT=8501
 API_BASE_URL=http://127.0.0.1:8000
 
-# Grottocenter API (pour intégration future)
-GROTTOCENTER_API_URL=https://api.grottocenter.org
-GROTTOCENTER_API_KEY=your_api_key_here
+# Grottocenter API (configuration active)
+GROTTOCENTER_URL=https://api.grottocenter.org
+GROTTOCENTER_TOKEN=your_bearer_token_here
 ```
 
 ## 💻 Utilisation
@@ -291,21 +315,40 @@ python run_frontend.py
 
 #### 📄 Upload de PDF
 1. Ouvrir l'interface Streamlit
-2. Glisser-déposer un fichier PDF (max 50MB)
-3. Cliquer sur "Uploader le PDF"
-4. Vérifier le statut et les détails du fichier
+2. Naviguer vers l'onglet "📄 Traitement PDF"
+3. Glisser-déposer un fichier PDF (max 50MB)
+4. Cliquer sur "Uploader le PDF"
+5. Vérifier le statut et les détails du fichier
+
+#### 🗂️ Édition de documents
+1. Naviguer vers l'onglet "🗂️ Éditeur de document"
+2. Entrer l'ID du document Grottocenter à modifier
+3. Modifier les champs (titre, description, licence, etc.)
+4. Enregistrer et valider automatiquement
+
+#### 🏗️ Héritage de propriétés
+1. Naviguer vers l'onglet "🏗️ Héritage de collection"
+2. Charger une collection parent par son ID
+3. Optionnellement modifier les propriétés de la collection
+4. Sélectionner les champs à hériter (licence, langue, etc.)
+5. Charger automatiquement tous les documents descendants
+6. Prévisualiser les changements
+7. Appliquer l'héritage en un clic sur tous les descendants
 
 #### ✅ Validations automatiques
 - **Format** : Vérification extension .pdf
 - **Taille** : Limite à 50MB configurable
 - **Intégrité** : Validation de la structure PDF
 - **Sécurité** : Nom de fichier unique avec timestamp
+- **API Grottocenter** : Validation automatique des documents modifiés
 
 ## 📚 API Documentation
 
 ### Endpoints disponibles
 
-#### `POST /pdf/upload`
+#### Routes PDF
+
+##### `POST /pdf/upload`
 Upload d'un fichier PDF avec validation complète.
 
 **Paramètres :**
@@ -322,16 +365,86 @@ Upload d'un fichier PDF avec validation complète.
 }
 ```
 
-**Réponse erreur (400/413) :**
+##### `GET /pdf/health`
+Vérification spécifique du service PDF.
+
+#### Routes Documents Grottocenter
+
+##### `GET /documents/{doc_id}`
+Récupérer un document Grottocenter par son ID.
+
+**Réponse :**
 ```json
 {
-  "success": false,
-  "error": "Le fichier dépasse la taille maximale autorisée de 50 MB",
-  "error_code": "PDF_ERROR"
+  "id": 12345,
+  "title": "Titre du document",
+  "description": "Description...",
+  "license": {"id": 1, "name": "CC-BY-SA"},
+  "mainLanguage": "fr",
+  "...": "autres champs"
 }
 ```
 
-#### `GET /health`
+##### `PUT /documents/{doc_id}`
+Mettre à jour un document Grottocenter.
+
+**Payload :**
+```json
+{
+  "title": "Nouveau titre",
+  "description": "Nouvelle description",
+  "license": {"id": 2}
+}
+```
+
+##### `PUT /documents/{doc_id}/validate`
+Valider un document Grottocenter.
+
+##### `PUT /documents/{doc_id}/update-and-validate`
+Mettre à jour et valider un document en une seule opération.
+
+##### `GET /documents/{doc_id}/children`
+Récupérer les enfants directs d'un document.
+
+##### `GET /documents/{doc_id}/descendants`
+Récupérer tous les descendants (enfants + petits-enfants) d'un document.
+
+**Réponse :**
+```json
+{
+  "documents": [{"id": 123, "title": "...", "type": "..."}],
+  "total": 42
+}
+```
+
+##### `POST /documents/{doc_id}/apply-inheritance`
+Appliquer l'héritage des propriétés sur les documents descendants.
+
+**Payload :**
+```json
+{
+  "heritable_fields": {
+    "license": {"id": 1},
+    "mainLanguage": "fr"
+  },
+  "child_ids": [123, 124, 125]
+}
+```
+
+**Réponse :**
+```json
+{
+  "success": [
+    {"id": 123, "title": "Document 1", "changes": {...}}
+  ],
+  "errors": [],
+  "total": 3
+}
+```
+
+#### Routes générales
+
+##### `GET /health`
 Vérification de l'état de l'API.
 
 **Réponse :**
@@ -339,17 +452,6 @@ Vérification de l'état de l'API.
 {
   "status": "ok",
   "message": "API is running"
-}
-```
-
-#### `GET /pdf/health`
-Vérification spécifique du service PDF.
-
-**Réponse :**
-```json
-{
-  "status": "ok",
-  "service": "pdf"
 }
 ```
 
@@ -462,6 +564,7 @@ python -m pip install --editable .
 - **[Pydantic](https://pydantic-docs.helpmanual.io/)** : Validation et sérialisation des données
 - **[Python-multipart](https://github.com/andrew-d/python-multipart)** : Gestion des uploads multipart
 - **[PyPDF2](https://pypdf2.readthedocs.io/)** (3.0.1) : Manipulation et validation PDF
+- **[HTTPX](https://www.python-httpx.org/)** : Client HTTP asynchrone moderne pour l'API Grottocenter
 
 ### Frontend  
 - **[Streamlit](https://streamlit.io/)** (1.28.1) : Framework d'applications web Python
@@ -484,17 +587,22 @@ python -m pip install --editable .
 - [x] Gestion d'erreurs robuste
 - [x] Interface utilisateur intuitive
 
-### Phase 2 : IA Processing 🚧
+### Phase 2 : Intégration Grottocenter ✅
+- [x] Connexion API Grottocenter (client HTTPX asynchrone)
+- [x] CRUD complet des documents
+- [x] Validation automatique des documents
+- [x] Interface web pour édition des documents
+- [x] Gestion des collections et hiérarchies
+- [x] Héritage automatique des propriétés parent-enfant
+- [x] Interface web spécialisée pour l'héritage
+- [x] Gestion des descendants (récursive)
+
+### Phase 3 : IA Processing 🚧
 - [ ] Division automatique PDF en articles
 - [ ] Extraction métadonnées (titre, auteur, date)
 - [ ] Prévisualisation et validation manuelle
 - [ ] Traitement par lots
-
-### Phase 3 : Intégration Grottocenter 🔮
-- [ ] Connexion API Grottocenter
-- [ ] Mapping automatique des métadonnées
-- [ ] Création/mise à jour documents
-- [ ] Gestion des collections et hiérarchies
+- [ ] Intégration IA avec workflow de collections
 
 ### Phase 4 : Production 🔮
 - [ ] Authentification utilisateurs
@@ -502,6 +610,8 @@ python -m pip install --editable .
 - [ ] Monitoring et logs avancés
 - [ ] Déploiement Docker
 - [ ] Tests automatisés complets
+- [ ] Optimisation performances (mise en cache, pagination)
+- [ ] Gestion des erreurs avancée (retry, circuit breaker)
 
 ## 🤝 Contribution
 

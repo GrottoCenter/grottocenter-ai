@@ -1,6 +1,70 @@
-__pycache__/
-*.pyc
-venv/
+# Fichiers et dossiers à ignorer lors du build Docker
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Environment
 .env
-uploads/*.pdf
-.streamlit/
+.env.local
+.env.*.local
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node.js (si applicable)
+node_modules/
+npm-debug.log*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local uploads (will be mounted as volume)
+uploads/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Backup files
+*.bak
+*.backup
