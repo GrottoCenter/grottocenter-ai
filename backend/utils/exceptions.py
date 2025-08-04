@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 
+
 class PDFException(HTTPException):
     """Exception personnalisée pour les erreurs PDF"""
     pass

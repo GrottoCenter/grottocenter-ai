@@ -1,13 +1,17 @@
-import streamlit as st
-import requests
-import json
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
+from typing import Any, Dict, List
+
+import requests
+import streamlit as st
+
+from .base import BaseEditor
 
 # --- Data Models ---
 
 @dataclass
 class DocumentField:
+        
+    
     key: str
     label: str
     current_value: Any
@@ -28,8 +32,9 @@ class DocumentField:
 
 # --- Main Editor Class ---
 
-class CollectionEditor:
+class CollectionEditor(BaseEditor):
     def __init__(self, api_base_url: str):
+        super().__init__()
         self.api_base_url = api_base_url
         self.license_mapping = {
             "CC-BY-SA": 1, "CC-BY": 2, "ODBL": 3, "ODC-BY": 4,
@@ -38,6 +43,7 @@ class CollectionEditor:
         }
         self.license_options = [""] + list(self.license_mapping.keys())
         self.identifier_type_options = ["", "doi", "issn", "isbn", "url"]
+        
 
     def show_interface(self):
         st.title("🗂️ Édition de document Grottocenter")
@@ -69,21 +75,6 @@ class CollectionEditor:
                 st.error(f"Erreur: {res.status_code} - {res.text}")
         except Exception as e:
             st.error(f"Erreur: {e}")
-
-    def _extract_values(self, doc: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            "title": doc.get("title", ""),
-            "description": doc.get("description", ""),
-            "identifier": doc.get("identifier", ""),
-            "pages": doc.get("pages", ""),
-            "creatorComment": doc.get("creatorComment", ""),
-            "mainLanguage": doc.get("mainLanguage", ""),
-            "license": doc.get("license", ""),  # string
-            "identifierType": doc.get("identifierType", ""),  # string
-            "iso3166": ";".join([entry.get("iso", "") for entry in doc.get("iso3166", [])]),
-            "authorizationDocument": str(doc.get("authorizationDocument", {}).get("id", "")),
-            "editor": str(doc.get("editor", {}).get("id", ""))
-        }
 
     def _show_form(self):
         doc = st.session_state.document

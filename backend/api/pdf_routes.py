@@ -1,8 +1,10 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-from ..models.pdf_models import PDFUploadResponse, PDFUploadError
+import os
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+
+from ..services.pdf_schema import PDFUploadResponse
 from ..services.pdf_service import PDFService
 from ..utils.exceptions import PDFException
-import os
 
 router = APIRouter(prefix="/pdf", tags=["PDF"])
 

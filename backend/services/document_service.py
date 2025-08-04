@@ -1,8 +1,9 @@
-from backend.client.base_client import get_client_async
+from backend.client.base_client import GrottocenterClient
 from backend.schemas.document_schemas import DocumentUpdateRequest
 
+
 class DocumentService:
-    def __init__(self, client):
+    def __init__(self, client : GrottocenterClient):
         self.client = client
 
     async def get_document(self, doc_id: int) -> dict:

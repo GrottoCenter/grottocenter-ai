@@ -2,9 +2,12 @@ import os
 import shutil
 from pathlib import Path
 from typing import Tuple
-from fastapi import UploadFile
+
 import PyPDF2
+from fastapi import UploadFile
+
 from ..utils.exceptions import FileSizeException, InvalidFileTypeException
+
 
 class PDFService:
     """Service pour la gestion des fichiers PDF"""
@@ -47,7 +50,7 @@ class PDFService:
             file_size = file_path.stat().st_size
             return filename, file_size
             
-        except Exception as e:
+        except Exception:
             # Nettoyer en cas d'erreur
             if file_path.exists():
                 file_path.unlink()

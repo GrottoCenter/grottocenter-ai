@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-import uvicorn
-import os
 import logging
+import os
+
+import uvicorn
 from dotenv import load_dotenv
 
 # Charger les variables d'environnement

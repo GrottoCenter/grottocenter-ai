@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import streamlit as st
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()

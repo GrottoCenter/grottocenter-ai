@@ -2,17 +2,20 @@
 Application FastAPI principale
 """
 
+import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import os
-from dotenv import load_dotenv
+
+# Import des routes
+from backend.api.document_routes import router as document_router
+from backend.api.pdf_routes import router as pdf_router
 
 # Charger les variables d'environnement
 load_dotenv()
 
-# Import des routes
-from backend.api.pdf_routes import router as pdf_router
-from backend.api.document_routes import router as document_router
+
 
 # Créer l'application FastAPI
 app = FastAPI(

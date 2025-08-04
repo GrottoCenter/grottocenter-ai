@@ -2,11 +2,11 @@
 Utilitaires pour la gestion des fichiers CSV
 """
 
+import base64
 import csv
 import io
-import base64
-from typing import List, Dict, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from backend.models.collection_models import CollectionRecord
 from backend.utils.exceptions import GrottocenterUpdateError
@@ -260,8 +260,8 @@ def load_csv_temp(file_path: str) -> str:
 
 def cleanup_temp_files(max_age_hours: int = 24):
     """Nettoyer les fichiers temporaires anciens"""
-    import time
     import os
+    import time
     
     temp_dir = Path("temp_csv")
     if not temp_dir.exists():

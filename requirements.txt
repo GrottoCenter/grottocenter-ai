@@ -99,3 +99,7 @@ watchdog==3.0.0
 
 # CSV enhanced processing
 csv-diff==1.0.0
+
+# Code quality and linting
+ruff==0.12.2
+

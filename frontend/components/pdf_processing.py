@@ -2,11 +2,12 @@
 Page Streamlit pour le traitement des PDF
 """
 
-import streamlit as st
-import requests
-from typing import Dict, Any
-import os
 import time
+from typing import Any, Dict
+
+import requests
+import streamlit as st
+
 
 def show_pdf_processing_page(api_base_url: str):
     """Page principale de traitement PDF"""
@@ -340,9 +341,10 @@ def show_pdf_history_tab(api_base_url: str):
     
     # Données mockées pour l'aperçu
     if st.checkbox("🎨 Aperçu des données futures"):
-        import pandas as pd
-        from datetime import datetime, timedelta
         import random
+        from datetime import datetime, timedelta
+
+        import pandas as pd
         
         # Générer des données fictives
         mock_data = []

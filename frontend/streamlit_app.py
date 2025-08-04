@@ -2,8 +2,9 @@
 Application Streamlit principale mise à jour avec les nouvelles interfaces
 """
 
-import streamlit as st
 import os
+
+import streamlit as st
 from dotenv import load_dotenv
 
 # Chargement des variables d'environnement

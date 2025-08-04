@@ -1,19 +1,19 @@
 # backend/client/base_client.py (Updated for asynchronous operations with httpx)
-import httpx 
-import time
+import asyncio  # For async sleep
 import logging
-from typing import Dict, Any, Optional, List
-from functools import wraps
-from dotenv import load_dotenv
 import os
-import asyncio # For async sleep
+from functools import wraps
+from typing import Any, Dict, Optional
+
+import httpx
+from dotenv import load_dotenv
 
 from .exceptions import (
     GrottocenterAPIError,
-    GrottocenterConnectionError,
     GrottocenterAuthError,
+    GrottocenterConnectionError,
     GrottocenterNotFoundError,
-    GrottocenterValidationError
+    GrottocenterValidationError,
 )
 
 
@@ -111,6 +111,7 @@ class GrottocenterClient:
     async def get(self, endpoint: str, params: Optional[Dict] = None) -> Dict[str, Any]:
         """Requête GET asynchrone"""
         client = await self._get_async_client()
+        print(client is not None)
         response = await client.get(self._build_url(endpoint), params=params)
         return await self._handle_response(response, endpoint)
 

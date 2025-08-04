@@ -1,8 +1,10 @@
-import streamlit as st
-import requests
-import json
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
+from typing import Any, Dict, List
+
+import requests
+import streamlit as st
+
+from .base import BaseEditor
 
 # --- Data Models ---
 
@@ -28,8 +30,9 @@ class DocumentField:
 
 # --- Main Inheritance Editor Class ---
 
-class CollectionInheritanceEditor:
+class CollectionInheritanceEditor(BaseEditor):
     def __init__(self, api_base_url: str):
+        super().__init__()
         self.api_base_url = api_base_url
         self.license_mapping = {
             "CC-BY-SA": 1, "CC-BY": 2, "ODBL": 3, "ODC-BY": 4,
@@ -142,21 +145,6 @@ class CollectionInheritanceEditor:
                 st.error(f"Erreur lors du chargement: {res.status_code} - {res.text}")
         except Exception as e:
             st.error(f"Erreur: {e}")
-
-    def _extract_values(self, doc: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            "title": doc.get("title", ""),
-            "description": doc.get("description", ""),
-            "identifier": doc.get("identifier", ""),
-            "pages": doc.get("pages", ""),
-            "creatorComment": doc.get("creatorComment", ""),
-            "mainLanguage": doc.get("mainLanguage", ""),
-            "license": doc.get("license", ""),
-            "identifierType": doc.get("identifierType", ""),
-            "iso3166": ";".join([entry.get("iso", "") for entry in doc.get("iso3166", [])]),
-            "authorizationDocument": str(doc.get("authorizationDocument", {}).get("id", "")),
-            "editor": str(doc.get("editor", {}).get("id", ""))
-        }
 
     def _show_collection_form(self):
         st.subheader("✏️ Modifier la collection")
