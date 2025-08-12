@@ -15,8 +15,6 @@ from backend.api.pdf_routes import router as pdf_router
 # Charger les variables d'environnement
 load_dotenv()
 
-
-
 # Créer l'application FastAPI
 app = FastAPI(
     title="Grottocenter AI Tools API",

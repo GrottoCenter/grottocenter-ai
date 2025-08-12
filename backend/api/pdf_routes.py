@@ -2,7 +2,7 @@ import os
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from ..services.pdf_schema import PDFUploadResponse
+from ..schemas.pdf_schema import PDFUploadResponse
 from ..services.pdf_service import PDFService
 from ..utils.exceptions import PDFException
 
