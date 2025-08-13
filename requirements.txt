@@ -103,3 +103,9 @@ csv-diff==1.0.0
 # Code quality and linting
 ruff==0.12.2
 
+# PDF Processing (nouveau)
+pymupdf==1.24.11   # Import as `fitz` - extraction pages & métadonnées
+
+# Optional: File type detection
+python-magic==0.4.27
+

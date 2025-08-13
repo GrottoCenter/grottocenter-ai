@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 
 
 class PDFException(HTTPException):
@@ -240,3 +240,21 @@ class ValidationTimeoutError(DocumentValidationException):
             status_code=504,
             detail=f"Timeout lors de la validation des documents: {', '.join(document_ids)}"
         )
+
+class PDFException(HTTPException):
+    pass
+
+class InvalidFileTypeException(PDFException):
+    def __init__(self, detail: str = "Invalid file type. PDF expected."):
+        super().__init__(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+class FileSizeException(PDFException):
+    def __init__(self, max_mb: int):
+        super().__init__(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File too large. Max {max_mb} MB."
+        )
+
+class PDFReadException(PDFException):
+    def __init__(self, detail: str = "Unable to read PDF (possibly corrupted or encrypted)."):
+        super().__init__(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
