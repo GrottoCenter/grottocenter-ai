@@ -1,5 +1,5 @@
 """
-Page Streamlit pour le traitement des PDF
+Page Streamlit pour le traitement des PDF - Interface améliorée
 """
 
 import time
@@ -26,11 +26,11 @@ def show_pdf_processing_page(api_base_url: str):
         st.error("Vérifiez que le backend est démarré et accessible.")
         return
 
-    # Tabs principales
-    tab1, tab2, tab3 = st.tabs(["📤 Upload PDF", "🤖 Traitement IA (à venir)", "📊 Historique"])
+    # Tabs principales avec nouvelle interface améliorée
+    tab1, tab2, tab3 = st.tabs(["📤 Analyse PDF", "🤖 Traitement IA", "📊 Historique"])
 
     with tab1:
-        show_pdf_upload_tab(api_base_url)
+        show_pdf_upload_tab_enhanced(api_base_url)
 
     with tab2:
         show_ai_processing_tab(api_base_url)
@@ -374,3 +374,266 @@ def show_processing_status(status: str, progress: float = 0):
 
     if progress > 0:
         st.progress(progress)
+
+
+def show_upload_results_enhanced(result: Dict[str, Any]):
+    """Affichage amélioré des résultats avec les nouvelles métadonnées."""
+    st.markdown("---")
+    st.subheader("📊 Résultats de l'analyse PDF")
+
+    meta = result.get("metadata") or {}
+    
+    # Informations de base du fichier
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Statut", "✅ Validé" if result.get("success") else "❌ Erreur")
+    with col2:
+        file_size_mb = (result.get("file_size") or 0) / (1024 * 1024)
+        st.metric("Taille", f"{file_size_mb:.2f} MB")
+    with col3:
+        st.metric("Nom d'origine", result.get("original_filename", "N/A"))
+    with col4:
+        st.metric("Pages", meta.get("page_count", 0))
+
+    # Vérification si le texte est extractible
+    is_text_extractable = meta.get("is_text_extractable", True)
+    
+    if not is_text_extractable:
+        st.warning("⚠️ PDF image uniquement - Texte non extractible")
+        st.info(meta.get("extraction_note", "Ce PDF semble être composé uniquement d'images. L'extraction de métadonnées textuelles n'est pas possible."))
+        
+        # Afficher seulement les métadonnées basiques disponibles
+        if meta.get("page_count"):
+            st.write(f"**Nombre de pages**: {meta['page_count']}")
+        
+        with st.expander("🔧 Détails techniques"):
+            st.json({
+                "stored_filename": result.get("stored_filename"),
+                "mime_type": result.get("mime_type"),
+                "sha256": result.get("sha256"),
+                "is_text_extractable": False
+            })
+        return
+
+    # Métadonnées textuelles complètes
+    st.markdown("**📄 Métadonnées du contenu**")
+    
+    # Titre (mise en évidence spéciale)
+    title = meta.get('title')
+    if title:
+        st.markdown(f"### 📖 {title}")
+    else:
+        st.markdown("### 📖 *Titre non détecté*")
+
+    # Informations principales en colonnes
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Caractéristiques visuelles
+        st.markdown("**🎨 Caractéristiques visuelles**")
+        is_color = meta.get('is_color')
+        if is_color is True:
+            st.success("🌈 Document en couleur")
+        elif is_color is False:
+            st.info("⬛ Document en noir et blanc")
+        else:
+            st.warning("❓ Type de couleur indéterminé")
+    
+    with col2:
+        # Langue
+        st.markdown("**🌍 Langue**")
+        language = meta.get('language')
+        language_names = {
+            'fr': '🇫🇷 Français',
+            'en': '🇬🇧 Anglais', 
+            'nl': '🇳🇱 Néerlandais',
+            'de': '🇩🇪 Allemand'
+        }
+        
+        if language and language in language_names:
+            st.success(language_names[language])
+        elif language:
+            st.info(f"🌐 {language.upper()}")
+        else:
+            st.warning("❓ Langue non détectée")
+
+    # Structure du document
+    st.markdown("**📋 Structure du document**")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        has_editorial = meta.get('has_editorial')
+        if has_editorial is True:
+            st.success("✍️ Éditorial détecté")
+        elif has_editorial is False:
+            st.info("📝 Pas d'éditorial détecté")
+        else:
+            st.warning("❓ Éditorial indéterminé")
+    
+    with col2:
+        has_summary = meta.get('has_summary')
+        if has_summary is True:
+            st.success("📋 Sommaire détecté")
+        elif has_summary is False:
+            st.info("📄 Pas de sommaire détecté")
+        else:
+            st.warning("❓ Sommaire indéterminé")
+
+    # Notes d'extraction
+    extraction_note = meta.get('extraction_note')
+    if extraction_note:
+        st.info(f"ℹ️ **Note**: {extraction_note}")
+
+    # Détails techniques en accordéon
+    with st.expander("🔧 Détails techniques"):
+        tech_details = {
+            "stored_filename": result.get("stored_filename"),
+            "mime_type": result.get("mime_type"),
+            "sha256": result.get("sha256"),
+            "metadata_raw": meta
+        }
+        st.json(tech_details)
+
+
+def show_pdf_upload_tab_enhanced(api_base_url: str):
+    """Version améliorée de l'onglet d'upload PDF."""
+    st.subheader("📤 Upload et analyse PDF avancée")
+
+    st.info(
+        """
+    **Analyse automatique incluse:**
+    - 📖 Extraction intelligente du titre
+    - 🎨 Détection couleur/noir et blanc  
+    - 📋 Détection de sommaire
+    - ✍️ Détection d'éditorial
+    - 🌍 Reconnaissance de langue
+    - 📄 Vérification du contenu textuel
+    
+    **Limitations:**
+    - Taille maximale: 50 MB
+    - Format: PDF uniquement
+    - PDFs image-only: métadonnées limitées
+    """
+    )
+
+    uploaded_file = st.file_uploader(
+        "Choisir un fichier PDF",
+        type=["pdf"],
+        help="Sélectionnez un document PDF à analyser (max 50MB)",
+    )
+
+    if uploaded_file is not None:
+        # Afficher les informations du fichier
+        file_size_mb = (getattr(uploaded_file, "size", None) or 0) / (1024 * 1024)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"📄 **Fichier:** {uploaded_file.name}")
+            st.info(f"📊 **Taille:** {file_size_mb:.2f} MB")
+
+        with col2:
+            if file_size_mb > 50:
+                st.error("❌ Fichier trop volumineux (> 50 MB)")
+                return
+            else:
+                st.success("✅ Taille acceptable")
+
+        # Section options d'analyse
+        st.markdown("---")
+        st.subheader("🔍 Options d'analyse")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info("✅ **Extraction automatique activée:**")
+            st.write("• Titre et structure")
+            st.write("• Détection couleur")
+            st.write("• Sommaire et éditorial")
+        with col2:
+            st.info("✅ **Analyses linguistiques:**")
+            st.write("• Reconnaissance de langue")
+            st.write("• Vérification du contenu textuel")
+            st.write("• Gestion des PDFs image-only")
+
+        # Bouton d'upload
+        st.markdown("---")
+
+        if st.button("🚀 Analyser le PDF", type="primary", use_container_width=True):
+            upload_and_analyze_pdf(api_base_url, uploaded_file)
+
+
+def upload_and_analyze_pdf(api_base_url: str, uploaded_file):
+    """Upload et analyse complète d'un fichier PDF."""
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    try:
+        # Étape 1: Préparation
+        status_text.text("📋 Préparation de l'analyse...")
+        progress_bar.progress(20)
+
+        # Étape 2: Upload
+        status_text.text("📤 Upload du fichier...")
+        progress_bar.progress(40)
+
+        # Reset du pointeur
+        try:
+            uploaded_file.seek(0)
+        except Exception:
+            pass
+
+        files = {"file": (uploaded_file.name, uploaded_file.read(), "application/pdf")}
+        response = requests.post(f"{api_base_url}/pdf/upload", files=files, timeout=60)
+
+        # Étape 3: Analyse des métadonnées
+        status_text.text("🔍 Analyse des métadonnées...")
+        progress_bar.progress(70)
+
+        # Étape 4: Finalisation
+        status_text.text("✅ Finalisation de l'analyse...")
+        progress_bar.progress(90)
+
+        if response.status_code == 200:
+            result = response.json()
+            progress_bar.progress(100)
+            status_text.text("🎉 Analyse terminée avec succès!")
+
+            st.success("✅ PDF analysé avec succès!")
+            st.session_state.last_uploaded_pdf = result
+            show_upload_results_enhanced(result)
+
+        else:
+            progress_bar.empty()
+            status_text.empty()
+
+            error_message = None
+            try:
+                error_data = response.json()
+                error_message = (
+                    error_data.get("error")
+                    or error_data.get("detail")
+                    or error_data.get("message")
+                    or "Erreur inconnue"
+                )
+            except Exception:
+                error_message = response.text or "Erreur inconnue"
+
+            st.error(f"❌ Erreur lors de l'analyse: {error_message}")
+
+            if response.status_code == 413:
+                st.error("📊 Le fichier est trop volumineux.")
+            elif response.status_code == 400:
+                st.error("📄 Format de fichier invalide.")
+
+    except requests.exceptions.Timeout:
+        progress_bar.empty()
+        status_text.empty()
+        st.error("⏱️ Timeout lors de l'analyse. Le fichier est peut-être trop volumineux.")
+    except requests.exceptions.ConnectionError:
+        progress_bar.empty()
+        status_text.empty()
+        st.error("🔌 Erreur de connexion au serveur d'analyse.")
+    except Exception as e:
+        progress_bar.empty()
+        status_text.empty()
+        st.error(f"❌ Erreur inattendue: {e}")
