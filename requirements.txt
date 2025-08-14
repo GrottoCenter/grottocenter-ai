@@ -1,0 +1,118 @@
+# Backend FastAPI Dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.4.2
+python-multipart==0.0.6
+python-dotenv==1.0.0
+
+# PDF Processing
+PyPDF2==3.0.1
+
+# Frontend Streamlit Dependencies  
+streamlit==1.28.1
+requests==2.31.0
+
+# Data Processing
+pandas==2.1.1
+numpy==1.24.3
+
+# Configuration Management
+configparser==6.0.0
+
+# CLI and Terminal Enhancements
+colorama==0.4.6
+yaspin==3.0.1
+
+# Utilities
+pathlib2==2.3.7
+
+# Optional: for future CSV processing enhancements
+openpyxl==3.1.2
+xlsxwriter==3.1.9
+
+# Optional: for future advanced data validation
+jsonschema==4.19.1
+
+# Testing (optional)
+pytest==7.4.2
+pytest-asyncio==0.21.1
+httpx==0.25.0
+
+# Development tools (optional)
+black==23.9.1
+flake8==6.1.0
+mypy==1.6.1
+
+# Type hints
+typing-extensions==4.8.0
+
+# Date and time utilities
+python-dateutil==2.8.2
+
+# For base64 handling and file utilities
+base64io==1.0.3
+
+# Enhanced error handling
+rich==13.6.0
+
+# For async operations
+asyncio==3.4.3
+
+# HTTP client with retry capabilities
+urllib3==2.0.6
+
+# JSON handling
+orjson==3.9.7
+
+# Cache management (if needed for future enhancements)
+diskcache==5.6.3
+
+# Logging enhancements
+loguru==0.7.2
+
+# Environment and system utilities
+psutil==5.9.6
+
+# File type detection
+python-magic==0.4.27
+
+# Progress bars for CLI
+tqdm==4.66.1
+
+# Markdown processing (for documentation)
+markdown==3.5.1
+
+# Time zone handling
+pytz==2023.3
+
+# SSL and security
+cryptography==41.0.7
+
+# Memory management
+pympler==0.9
+
+# Process management
+multiprocessing-logging==0.3.4
+
+# File system utilities
+watchdog==3.0.0
+
+# CSV enhanced processing
+csv-diff==1.0.0
+
+# Code quality and linting
+ruff==0.12.2
+
+# PDF Processing (nouveau)
+pymupdf==1.24.11   # Import as `fitz` - extraction pages & métadonnées
+
+# Language Detection
+langdetect==1.0.9  # Improved language detection for PDF content
+
+# Optional: Advanced language detection alternatives
+# fasttext==0.9.2  # Uncomment for fastest language detection (80x faster)
+# lingua-py==2.0.2  # Uncomment for highest accuracy language detection
+
+# Optional: File type detection
+python-magic==0.4.27
+
