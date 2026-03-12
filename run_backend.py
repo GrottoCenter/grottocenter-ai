@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     # Lancer l'application FastAPI avec Uvicorn
     uvicorn.run(
-        "backend.main:app",
+        "backendV2.main:app",
         host=host,
         port=port,
         reload=True
