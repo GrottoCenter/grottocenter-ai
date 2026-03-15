@@ -26,23 +26,6 @@ yaspin==3.0.1
 # Utilities
 pathlib2==2.3.7
 
-# Optional: for future CSV processing enhancements
-openpyxl==3.1.2
-xlsxwriter==3.1.9
-
-# Optional: for future advanced data validation
-jsonschema==4.19.1
-
-# Testing (optional)
-pytest==7.4.2
-pytest-asyncio==0.21.1
-httpx==0.25.0
-
-# Development tools (optional)
-black==23.9.1
-flake8==6.1.0
-mypy==1.6.1
-
 # Type hints
 typing-extensions==4.8.0
 
@@ -109,10 +92,6 @@ pymupdf==1.24.11   # Import as `fitz` - extraction pages & métadonnées
 # Language Detection
 langdetect==1.0.9  # Improved language detection for PDF content
 
-# Optional: Advanced language detection alternatives
-# fasttext==0.9.2  # Uncomment for fastest language detection (80x faster)
-# lingua-py==2.0.2  # Uncomment for highest accuracy language detection
-
-# Optional: File type detection
-python-magic==0.4.27
-
+# Celery for asynchronous task management
+celery==5.3.0
+celery[redis]==5.3.0  # Redis as the message broker for Celery
