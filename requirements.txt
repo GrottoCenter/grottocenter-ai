@@ -1,7 +1,7 @@
 # Backend FastAPI Dependencies
-fastapi==0.104.1
+fastapi==0.135.2
 uvicorn[standard]==0.24.0
-pydantic==2.4.2
+pydantic==2.12.5
 python-multipart==0.0.6
 python-dotenv==1.0.0
 
@@ -27,7 +27,7 @@ yaspin==3.0.1
 pathlib2==2.3.7
 
 # Type hints
-typing-extensions==4.8.0
+typing-extensions==4.15.0
 
 # Date and time utilities
 python-dateutil==2.8.2
@@ -92,3 +92,6 @@ pymupdf==1.27.2.2   # Import as `fitz` - extraction pages & métadonnées
 pytesseract==0.3.10
 Pillow==9.4.0
 langdetect==1.0.9  # Improved language detection for PDF content
+
+# LLM
+ollama==0.6.1

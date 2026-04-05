@@ -92,4 +92,4 @@ def extract_pdf_text_for_llm(pdf_input: PdfInput, ocr_fallback: bool = True) -> 
     finally:
         doc.close()
 
-    return "\n\n".join(pages_text).strip()
+    return pages_text
