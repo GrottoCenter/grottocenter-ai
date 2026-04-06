@@ -1,5 +1,5 @@
 from celery import Celery
-from ..config.celeryconfig import CeleryConfig
+from config.celeryconfig import CeleryConfig
 
 class CeleryService:
     def __init__(self):

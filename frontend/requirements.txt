@@ -1,0 +1,8 @@
+# Interface utilisateur
+streamlit==1.28.1
+
+# Appels API vers le backend
+requests==2.31.0
+
+# Gestion des variables d'environnement
+python-dotenv==1.0.0

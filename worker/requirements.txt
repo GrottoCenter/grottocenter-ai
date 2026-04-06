@@ -1,0 +1,17 @@
+# Celery & Broker
+celery==5.3.0
+celery[redis]==5.3.0
+
+# PDF & Images
+pymupdf==1.27.2.2
+pytesseract==0.3.10
+Pillow==9.4.0
+
+# Outils IA & Langue
+langdetect==1.0.9
+ollama==0.6.1
+
+pydantic==2.12.5
+
+# database
+minio==7.2.0

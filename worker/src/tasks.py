@@ -1,5 +1,6 @@
 import os
 import re
+import uuid as uuid_lib
 from datetime import datetime
 
 import fitz
@@ -8,8 +9,9 @@ from langdetect import LangDetectException, detect
 
 from backendV2.config.celeryconfig import CeleryConfig
 from backendV2.model.Document import DocumentMetadata
-from backendV2.worker import ocr
-from backendV2.worker.llm_analyzer import extract_metadata_with_llm, generate_global_summary
+from backendV2.service.minioService import MinioService
+from worker.src import ocr
+from worker.src.llm_analyzer import extract_metadata_with_llm, generate_global_summary
 
 
 celery_app = Celery("tasks")
@@ -17,27 +19,29 @@ celery_app.config_from_object(CeleryConfig)
 
 
 @celery_app.task(name="tasks.test_celery_task")
-def test_celery_task(file_path: str):
+def test_celery_task(object_name: str): 
+    minio_service = MinioService()
+
+    temp_file_path = f"/tmp/{uuid_lib.uuid4()}.pdf"
+    
     try:
-        pages = ocr.extract_pdf_text_for_llm(file_path)
+        minio_service.download_file(object_name, temp_file_path)
+
+        pages = ocr.extract_pdf_text_for_llm(temp_file_path)
         
-        # Le texte complet reste utile pour les regex déterministes
         full_text = "\n\n".join(pages)
         
-        # Découpage des pages en blocs de 4 pages
         chunks = []
         for i in range(0, len(pages), 4):
             chunks.append("\n\n".join(pages[i:i+4]))
             
         print(f"Document divisé en {len(chunks)} blocs de 4 pages.")
 
-        deterministic = _extract_deterministic_metadata(file_path, full_text)
+        deterministic = _extract_deterministic_metadata(temp_file_path, full_text)
         
-        # L'extraction JSON ne reçoit que le premier et dernier bloc pour se concentrer sur les métadonnées souvent présentes en début/fin de document
         metadata_text = "\n\n".join([chunks[0], chunks[len(chunks)-1]]) if chunks else ""
         llm = extract_metadata_with_llm(metadata_text, known_metadata=deterministic)
         
-        # Génération du résumé avec du Map-Reduce
         langue_doc_detectee = llm.language or deterministic.language or None
         global_summary = generate_global_summary(chunks, language=langue_doc_detectee)
         
@@ -55,8 +59,13 @@ def test_celery_task(file_path: str):
             "error": str(e)
         }
     finally:
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+            
+        try:
+            minio_service.delete_file(object_name)
+        except Exception as e:
+            print(f"Erreur nettoyage minio : {e}")
 
 
 def _extract_deterministic_metadata(file_path: str, text: str) -> DocumentMetadata:

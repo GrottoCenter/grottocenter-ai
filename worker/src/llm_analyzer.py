@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import ollama as ollama_client
 
-from backendV2.config.ollamaconfig import OllamaConfig
+from worker.src.ollamaconfig import OllamaConfig
 from backendV2.model.Document import DocumentMetadata
 
 

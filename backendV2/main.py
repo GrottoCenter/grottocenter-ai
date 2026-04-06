@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import des routes
-from backendV2.controller.documentController import router as document_router
+from controller.documentController import router as document_router
 
 # Créer l'application FastAPI
 app = FastAPI(

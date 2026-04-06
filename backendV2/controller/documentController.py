@@ -1,8 +1,6 @@
 from uuid import UUID
-
 from fastapi import APIRouter, Depends, UploadFile
-
-from backendV2.service.documentService import DocumentService
+from service.documentService import DocumentService
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
