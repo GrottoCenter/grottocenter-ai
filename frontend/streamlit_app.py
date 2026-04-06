@@ -34,7 +34,8 @@ def main():
             "🏠 Accueil": "home",
             "📝 Modifier Document": "collection",
             "🏗️ Héritage Collection": "inheritance",
-            "📄 Traitement PDF": "pdf"
+            "📄 Traitement PDF": "pdf",
+            "📤 Envoi Simple PDF": "simple_pdf"
         }
 
         selected_page_display = st.radio(
@@ -54,6 +55,8 @@ def main():
         show_inheritance_page()
     elif selected_page == "pdf":
         show_pdf_page()
+    elif selected_page == "simple_pdf":
+        show_simple_pdf_upload_page() 
 
 def show_home_page():
     """Page d'accueil mise à jour"""
@@ -131,6 +134,17 @@ def show_pdf_page():
         show_pdf_processing_page(API_BASE_URL)
     except Exception as e:
         st.error("❌ Impossible de charger le module PDF")
+        st.exception(e)
+
+def show_simple_pdf_upload_page():
+    try:
+        from components.simple_pdf_upload import show_simple_pdf_upload
+        show_simple_pdf_upload(API_BASE_URL)
+    except ImportError as e:
+        st.error("❌ **Erreur d'import du module simple_pdf_upload**")
+        st.exception(e)
+    except Exception as e:
+        st.error("❌ **Erreur lors du chargement de la page d'envoi PDF**")
         st.exception(e)
 
 if __name__ == "__main__":
