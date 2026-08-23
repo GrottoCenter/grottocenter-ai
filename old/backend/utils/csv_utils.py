@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from backend.models.collection_models import CollectionRecord
-from backend.utils.exceptions import GrottocenterUpdateError
+from old.backend.utils.exceptions import GrottocenterUpdateError
 
 
 class CSVUtils:

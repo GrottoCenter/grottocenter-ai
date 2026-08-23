@@ -1,0 +1,23 @@
+from enum import Enum
+
+class GrottocenterType(str, Enum):
+    COLLECTION = "collection"
+    DATASET = "dataset"
+    EVENT = "event"
+    IMAGE = "image"
+    INTERACTIVE_RESOURCE = "interactive_resource"
+    MOVING_IMAGE = "moving_image"
+    PHYSICAL_OBJECT = "physical_object"
+    SERVICE = "service"
+    SOFTWARE = "software"
+    SOUND = "sound"
+    STILL_IMAGE = "still_image"
+    TEXT = "text"
+    TOPOGRAPHIC_DRAWING = "topographic_drawing"
+    TOPOGRAPHIC_DATA = "topographic_data"
+    BOOK = "book"
+    ISSUE = "issue"
+    ARTICLE = "article"
+    MAP = "map"
+    AUTHORIZATION_TO_PUBLISH = "authorization_to_publish"
+    REPORT = "report"

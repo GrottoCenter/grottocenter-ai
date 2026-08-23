@@ -1,5 +1,5 @@
-from backend.client.base_client import GrottocenterClient
-from backend.schemas.document_schemas import DocumentUpdateRequest
+from old.backend.client.base_client import GrottocenterClient
+from old.backend.schemas.document_schemas import DocumentUpdateRequest
 
 
 class DocumentService:

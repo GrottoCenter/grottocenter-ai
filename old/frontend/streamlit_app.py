@@ -105,7 +105,7 @@ def show_home_page():
 def show_collection_page():
     """Page de modification classique des documents"""
     try:
-        from components.collection_editor import show_collection_editor
+        from old.frontend.components.collection_editor import show_collection_editor
         show_collection_editor(API_BASE_URL)
     except ImportError as e:
         st.error("❌ **Erreur d'import du module collection_editor**")
@@ -117,7 +117,7 @@ def show_collection_page():
 def show_inheritance_page():
     """Page d'héritage de collection"""
     try:
-        from components.collection_inheritance import show_collection_inheritance
+        from old.frontend.components.collection_inheritance import show_collection_inheritance
         show_collection_inheritance(API_BASE_URL)
     except ImportError as e:
         st.error("❌ **Erreur d'import du module collection_inheritance**")
@@ -130,7 +130,7 @@ def show_inheritance_page():
 def show_pdf_page():
     st.header("📄 Traitement des documents PDF")
     try:
-        from components.pdf_processing import show_pdf_processing_page
+        from old.frontend.components.pdf_processing import show_pdf_processing_page
         show_pdf_processing_page(API_BASE_URL)
     except Exception as e:
         st.error("❌ Impossible de charger le module PDF")
@@ -138,7 +138,7 @@ def show_pdf_page():
 
 def show_simple_pdf_upload_page():
     try:
-        from components.simple_pdf_upload import show_simple_pdf_upload
+        from old.frontend.components.simple_pdf_upload import show_simple_pdf_upload
         show_simple_pdf_upload(API_BASE_URL)
     except ImportError as e:
         st.error("❌ **Erreur d'import du module simple_pdf_upload**")

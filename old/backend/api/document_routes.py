@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.client.base_client import get_client_async
-from backend.schemas.document_schemas import (
+from old.backend.client.base_client import get_client_async
+from old.backend.schemas.document_schemas import (
     DocumentUpdateRequest,
     InheritanceRequest,
     InheritanceResult,
 )
-from backend.services.document_service import DocumentService
+from old.backend.services.document_service import DocumentService
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 

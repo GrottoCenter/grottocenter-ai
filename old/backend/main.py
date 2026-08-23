@@ -9,8 +9,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import des routes
-from backend.api.document_routes import router as document_router
-from backend.api.pdf_routes import router as pdf_router
+from old.backend.api.document_routes import router as document_router
+from old.backend.api.pdf_routes import router as pdf_router
 
 # Charger les variables d'environnement
 load_dotenv()
