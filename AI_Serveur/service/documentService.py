@@ -6,6 +6,11 @@ import logging
 from fastapi import UploadFile
 from service.documentLlmAnalyzeService import LLMAnalyzerService
 
+from model.DocumentMetadata import DocumentMetadata as DocumentMetadataModel
+from model.DocumentMetadata import DocumentAnalyseMetadata
+
+from model.GrottocenterType import GrottocenterType
+
 import time
 from uuid import UUID
 
@@ -15,6 +20,33 @@ class DocumentService:
 
     def __init__(self, analyzer_service: LLMAnalyzerService):
         self.analyzer_service = analyzer_service
+
+    @staticmethod
+    def map_document_analysis_to_metadata(document_analysis: DocumentAnalyseMetadata | dict) -> list[DocumentMetadataModel]:
+        analysis = DocumentAnalyseMetadata.model_validate(document_analysis)
+
+        if not analysis.articles:
+            return [DocumentMetadataModel.model_validate(analysis.model_dump())]
+        
+        shared_metadata = analysis.model_dump(
+            exclude={"identifiers", "articles"},
+        )
+        documents = []
+
+        for article in analysis.articles:
+            article_metadata = {
+                **shared_metadata,
+                "title": article.title,
+                "authors": article.authors,
+                "publication_date": article.publication_date or analysis.publication_date,
+                "grottocenter_type": GrottocenterType.ARTICLE,
+                "identifiers": [],
+                "parent": analysis.title,
+                "pages": f"{article.page_start}-{article.page_end}",
+            }
+            documents.append(DocumentMetadataModel.model_validate(article_metadata))
+
+        return documents
     
     
     async def process_document(self, file: UploadFile) -> dict:
@@ -28,6 +60,7 @@ class DocumentService:
             for page_number, page in enumerate(pdf, start=1)
             if page.get_text().strip()
         )
+        page_count = pdf.page_count
         pdf.close()
 
         if len(document_text) < 1000:
@@ -38,9 +71,15 @@ class DocumentService:
             raise ValueError("No text could be extracted from the PDF")
 
         document_analysis = await self.analyzer_service.analyze_document(document_text)
-        
+
+        document_metadata = self.map_document_analysis_to_metadata(document_analysis)
+        for metadata in document_metadata:
+            metadata.formats = [file.content_type]
+            if not metadata.pages:
+                metadata.pages = str(page_count)
+
         return {
             "message": "success", 
             "filename": unique_filename,
-            "document_analysis": document_analysis
+            "document_metadata": document_metadata
         }

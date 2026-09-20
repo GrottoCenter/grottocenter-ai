@@ -7,7 +7,7 @@ from typing import Any, TypedDict
 from fastapi import UploadFile
 
 from client.GreenPT import Models
-from model.DocumentMetadata import DocumentMetadata as DocumentMetadataModel
+from model.DocumentMetadata import DocumentAnalyseMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class LLMAnalyzerService:
     MAP_CHUNK_TOKEN_BUDGET = 50_000
 
     SCHEMA_BLOCK = json.dumps(
-        DocumentMetadataModel.model_json_schema(),
+        DocumentAnalyseMetadata.model_json_schema(),
         ensure_ascii=False,
         indent=2,
     )
@@ -130,7 +130,7 @@ class LLMAnalyzerService:
     def empty_metadata() -> dict[str, Any]:
         return {
             field_name: None
-            for field_name in DocumentMetadataModel.model_fields
+            for field_name in DocumentAnalyseMetadata.model_fields
         }
 
     @classmethod

@@ -46,6 +46,68 @@ class ArticleMetadata(BaseModel):
     )
 
 
+class DocumentAnalyseMetadata(BaseModel):
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
+
+    title: Optional[str] = Field(
+        default=None,
+        description="Main title of the document.",
+    )
+
+    authors: List[str] = Field(
+        default_factory=list,
+        description="Authors or creators of the document.",
+    )
+
+    publisher: Optional[str] = Field(
+        default=None,
+        description="Publisher or publishing organization.",
+    )
+
+    publication_date: Optional[date] = Field(
+        default=None,
+        description="Publication date.",
+    )
+    
+    identifiers: List[str] = Field(
+        default_factory=list,
+        description="DOI, ISBN, ISSN, URL, or other identifiers.",
+    )
+
+    languages: List[str] = Field(
+        default_factory=list,
+        description="ISO 639-3 languages, for example fra or eng.",
+    )
+
+    descriptions: List[str] = Field(
+        default_factory=list,
+        description="Descriptions or summaries of the document.",
+    )
+
+    subject: TopLevelSubjectCode = Field(
+        default=None,
+        description="Subject from the t_subject taxonomy.",
+    )
+    
+    grottocenter_type: Optional[GrottocenterType] = Field(
+        default=None,
+        description="Grottocenter document type.",
+    )
+    
+    rights: List[LicenseName] = Field(
+        default_factory=list,
+        description="Licenses and usage rights.",
+    )
+
+    articles: Optional[List[ArticleMetadata]] = Field(
+        default=None,
+        description="Articles contained in the document when it is an issue.",
+    )
+
 class DocumentMetadata(BaseModel):
 
     model_config = ConfigDict(
@@ -72,6 +134,11 @@ class DocumentMetadata(BaseModel):
         default=None,
         description="Publication date.",
     )
+    
+    identifiers: List[str] = Field(
+        default_factory=list,
+        description="DOI, ISBN, ISSN, URL, or other identifiers.",
+    )
 
     languages: List[str] = Field(
         default_factory=list,
@@ -87,15 +154,20 @@ class DocumentMetadata(BaseModel):
         default=None,
         description="Subject from the t_subject taxonomy.",
     )
-
+    
+    grottocenter_type: Optional[GrottocenterType] = Field(
+        default=None,
+        description="Grottocenter document type.",
+    )
+    
+    rights: List[LicenseName] = Field(
+        default_factory=list,
+        description="Licenses and usage rights.",
+    )
+    
     formats: List[str] = Field(
         default_factory=list,
         description="Formats or MIME types of associated files.",
-    )
-
-    identifiers: List[str] = Field(
-        default_factory=list,
-        description="DOI, ISBN, ISSN, URL, or other identifiers.",
     )
 
     sources: List[str] = Field(
@@ -103,22 +175,12 @@ class DocumentMetadata(BaseModel):
         description="Bibliographic sources.",
     )
 
-    rights: List[LicenseName] = Field(
-        default_factory=list,
-        description="Licenses and usage rights.",
-    )
-
-    grottocenter_type: Optional[GrottocenterType] = Field(
+    parent: Optional[str] = Field(
         default=None,
-        description="Grottocenter document type.",
+        description="Parent document identifier if this document is part of a larger work.",
     )
 
     pages: Optional[str] = Field(
         default=None,
         description="Pagination or page count.",
-    )
-
-    articles: Optional[List[ArticleMetadata]] = Field(
-        default=None,
-        description="Articles contained in the document when it is an issue.",
     )
