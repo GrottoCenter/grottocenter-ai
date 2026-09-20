@@ -1,13 +1,14 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, Request, UploadFile
+from service.documentLlmAnalyzeService import LLMAnalyzerService
 from service.documentService import DocumentService
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
-@router.get("/{doc_id}")
-async def get_document(doc_id: UUID, service: DocumentService = Depends()):
-    return await service.get_document(doc_id)
+def get_document_service(request: Request) -> DocumentService:
+    analyzer_service = LLMAnalyzerService(request.app.state.greenpt_client)
+    return DocumentService(analyzer_service)
 
-@router.post("/")
-async def process_document(file: UploadFile, service: DocumentService = Depends()):
+@router.post("/analyze")
+async def process_document(file: UploadFile, service: DocumentService = Depends(get_document_service)):
     return await service.process_document(file)

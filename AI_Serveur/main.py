@@ -2,19 +2,22 @@
 Application FastAPI principale
 """
 
-import os
+import logging
+import sys
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import des routes
+from client.HttpClient import httpClient
 from controller.documentController import router as document_router
 
 # Créer l'application FastAPI
 app = FastAPI(
     title="Grottocenter AI Tools API",
     description="API pour les outils IA de traitement des documents Grottocenter",
-    version="0.2.0"
+    version="0.2.0",
+    lifespan=httpClient
 )
 
 # Configuration CORS
@@ -24,6 +27,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stdout,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    force=True,
 )
 
 # Routes principales

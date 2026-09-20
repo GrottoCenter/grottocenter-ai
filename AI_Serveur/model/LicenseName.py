@@ -1,9 +1,6 @@
 from enum import Enum
 
 class LicenseName(str, Enum):
-    """
-    Valeurs actuellement présentes dans t_license.name.
-    """
 
     CC_BY_SA = "CC-BY-SA"
     CC_BY = "CC-BY"

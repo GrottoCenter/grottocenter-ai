@@ -1,11 +1,6 @@
 from enum import Enum
 
 class TopLevelSubjectCode(str, Enum):
-    """
-    Grandes catégories de t_subject.
-
-    Les sous-sujets utilisent des codes comme 1.1, 1.1.0.1 ou 8.3.4.
-    """
 
     KARSTOLOGY_AND_GEOSPELEOLOGY = "1"
     REGIONAL_SPELEOLOGY_AND_KARSTOLOGY = "2"
