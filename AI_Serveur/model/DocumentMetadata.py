@@ -1,7 +1,7 @@
 from datetime import date
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from model.GrottocenterType import GrottocenterType
 from model.LicenseName import LicenseName
@@ -108,6 +108,18 @@ class DocumentAnalyseMetadata(BaseModel):
         description="Articles contained in the document when it is an issue.",
     )
 
+    @field_validator(
+        "authors",
+        "identifiers",
+        "languages",
+        "descriptions",
+        "rights",
+        mode="before",
+    )
+    @classmethod
+    def convert_null_lists_to_empty_lists(cls, value):
+        return [] if value is None else value
+
 class DocumentMetadata(BaseModel):
 
     model_config = ConfigDict(
@@ -150,7 +162,7 @@ class DocumentMetadata(BaseModel):
         description="Descriptions or summaries of the document.",
     )
 
-    subject: TopLevelSubjectCode = Field(
+    subject: Optional[TopLevelSubjectCode] = Field(
         default=None,
         description="Subject from the t_subject taxonomy.",
     )
