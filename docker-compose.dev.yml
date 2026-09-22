@@ -1,0 +1,15 @@
+services:
+  backend:
+    build: ./AI_Serveur
+    container_name: grottocenter-ai-serveur
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - GREENPT_API_URL=https://api.greenpt.ai/v1
+      - GREENPT_API_KEY=${GREENPT_API_KEY}
+      - AUTH_VERIFY_URL=http://host.docker.internal:1337/api/v1/auth/check
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./AI_Serveur:/app
+    restart: unless-stopped
