@@ -26,12 +26,19 @@ class DocumentService:
         analysis = DocumentAnalyseMetadata.model_validate(document_analysis)
 
         if not analysis.articles:
-            return [DocumentMetadataModel.model_validate(analysis.model_dump())]
-        
+            return [
+                DocumentMetadataModel.model_validate(
+                    analysis.model_dump(exclude={"articles"})
+                )
+            ]
+
+        issue_metadata = DocumentMetadataModel.model_validate(
+            analysis.model_dump(exclude={"articles"})
+        )
         shared_metadata = analysis.model_dump(
             exclude={"identifiers", "articles"},
         )
-        documents = []
+        documents = [issue_metadata]
 
         for article in analysis.articles:
             article_metadata = {
@@ -53,6 +60,8 @@ class DocumentService:
         unique_filename = str(UUID(int=time.time_ns())) + ".pdf"
         
         file_content = await file.read()
+
+        logger.info("Processing document file %s", unique_filename)
 
         pdf = fitz.open(stream=file_content, filetype="pdf")
         document_text = "\n\n".join(

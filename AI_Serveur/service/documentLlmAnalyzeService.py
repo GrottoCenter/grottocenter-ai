@@ -133,6 +133,10 @@ class LLMAnalyzerService:
             for field_name in DocumentAnalyseMetadata.model_fields
         }
 
+    @staticmethod
+    def format_json_for_log(value: Any) -> str:
+        return json.dumps(value, ensure_ascii=False, indent=2, default=str)
+
     @classmethod
     def parse_json_response(cls, response: dict[str, Any]) -> dict[str, Any]:
         choices = response.get("choices", [])
@@ -165,10 +169,13 @@ class LLMAnalyzerService:
             response = await self.greenpt_client.call_greenpt_chat(
                 document_text,
                 system_prompt=self.REDUCE_SYSTEM_PROMPT,
-                model=Models.MISTRAL,
+                model=Models.GLM,
             )
 
-            logger.info("Single call response: %s", response)
+            logger.info(
+                "Single call response:\n%s",
+                self.format_json_for_log(response),
+            )
 
             responses.append(response)
             mode = "single"
@@ -187,10 +194,14 @@ class LLMAnalyzerService:
                     prompt,
                     system_prompt=self.MAP_SYSTEM_PROMPT,
                     model=Models.MISTRAL,
-                    max_tokens=1200,
+                    max_tokens=2000,
                 )
 
-                logger.info("Map call response for chunk %s: %s", chunk['chunk_id'], response)
+                logger.info(
+                    "Map call response for chunk %s:\n%s",
+                    chunk["chunk_id"],
+                    self.format_json_for_log(response),
+                )
 
                 responses.append(response)
                 map_results.append(self.parse_json_response(response))

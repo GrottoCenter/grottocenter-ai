@@ -87,11 +87,6 @@ class DocumentAnalyseMetadata(BaseModel):
         default_factory=list,
         description="Descriptions or summaries of the document.",
     )
-
-    subject: TopLevelSubjectCode = Field(
-        default=None,
-        description="Subject from the t_subject taxonomy.",
-    )
     
     grottocenter_type: Optional[GrottocenterType] = Field(
         default=None,
@@ -160,11 +155,6 @@ class DocumentMetadata(BaseModel):
     descriptions: List[str] = Field(
         default_factory=list,
         description="Descriptions or summaries of the document.",
-    )
-
-    subject: Optional[TopLevelSubjectCode] = Field(
-        default=None,
-        description="Subject from the t_subject taxonomy.",
     )
     
     grottocenter_type: Optional[GrottocenterType] = Field(

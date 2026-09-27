@@ -9,6 +9,7 @@ class Models(enum.Enum):
     MISTRAL = "mistral-small-3.2-24b-instruct-2506"
     GPT = "gpt-oss-120b"
     GEMMA = "gemma-3-27b-it"
+    GLM = "glm-5.3-flash"
 
 class ReasoningEffort(enum.Enum):
     LOW = "low"
@@ -39,7 +40,7 @@ class GreenPTClient:
             "top_p": 1,
             "max_tokens": max_tokens,
             "stream": False,
-            "reasoning_effort": ReasoningEffort.MEDIUM.value,
+            "reasoning_effort": ReasoningEffort.LOW.value,
         }
 
         response = await self.http_client.post("/chat/completions", json=body)
