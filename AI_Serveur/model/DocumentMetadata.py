@@ -25,16 +25,6 @@ class ArticleMetadata(BaseModel):
         description="Authors or creators of the article.",
     )
 
-    grottocenter_type: Literal["article"] = Field(
-        default="article",
-        description="Grottocenter type of the nested document.",
-    )
-
-    publication_date: Optional[date] = Field(
-        default=None,
-        description="Publication date of the article.",
-    )
-
     page_start: Optional[int] = Field(
         default=None,
         description="First page of the article.",

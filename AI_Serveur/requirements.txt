@@ -9,3 +9,6 @@ pydantic==2.12.5
 
 # HTTP client
 httpx==0.24.1
+
+# MongoDB
+pymongo==4.15.1

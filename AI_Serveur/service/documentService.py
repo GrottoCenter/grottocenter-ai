@@ -4,10 +4,15 @@ import shutil
 import fitz
 import logging
 from fastapi import UploadFile
+from repository.mongo import MongoRepository
 from service.documentLlmAnalyzeService import LLMAnalyzerService
+
+import hashlib
+from pathlib import Path
 
 from model.DocumentMetadata import DocumentMetadata as DocumentMetadataModel
 from model.DocumentMetadata import DocumentAnalyseMetadata
+from model.MongoDocument import MongoDocument
 
 from model.GrottocenterType import GrottocenterType
 
@@ -18,8 +23,9 @@ logger = logging.getLogger(__name__)
 
 class DocumentService:
 
-    def __init__(self, analyzer_service: LLMAnalyzerService):
+    def __init__(self, analyzer_service: LLMAnalyzerService, mongo_repository: MongoRepository):
         self.analyzer_service = analyzer_service
+        self.mongo_repository = mongo_repository
 
     @staticmethod
     def map_document_analysis_to_metadata(document_analysis: DocumentAnalyseMetadata | dict) -> list[DocumentMetadataModel]:
@@ -58,10 +64,33 @@ class DocumentService:
     
     async def process_document(self, file: UploadFile) -> dict:
         unique_filename = str(UUID(int=time.time_ns())) + ".pdf"
-        
+
         file_content = await file.read()
+        if file_content is None or len(file_content) == 0:
+            raise ValueError("Uploaded file is empty")
+
+        documents_existing = self.mongo_repository.get_with_hash(self.get_file_hash(file_content))
+        if documents_existing:
+            return {
+                "message": "success",
+                "filename": unique_filename,
+                "document_metadata": documents_existing
+            }
+        
+        document_metadata = await self.analyze(file_content, unique_filename, file)
 
         logger.info("Processing document file %s", unique_filename)
+
+        return {
+            "message": "success", 
+            "filename": unique_filename,
+            "document_metadata": document_metadata
+        }
+
+    
+
+    async def analyze(self, unique_filename: str, file: UploadFile) -> dict:
+        file_content = await file.read()
 
         pdf = fitz.open(stream=file_content, filetype="pdf")
         document_text = "\n\n".join(
@@ -87,8 +116,8 @@ class DocumentService:
             if not metadata.pages:
                 metadata.pages = str(page_count)
 
-        return {
-            "message": "success", 
-            "filename": unique_filename,
-            "document_metadata": document_metadata
-        }
+        return document_metadata
+
+
+    def get_file_hash(file_content: bytes) -> str:
+        return hashlib.sha256(file_content).hexdigest()
