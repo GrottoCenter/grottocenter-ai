@@ -1,23 +1,19 @@
-import os
-import shutil
+import hashlib
+import logging
+import time
+from datetime import datetime, timezone
+from uuid import UUID
 
 import fitz
-import logging
-from fastapi import UploadFile
 from repository.mongo import MongoRepository
 from service.documentLlmAnalyzeService import LLMAnalyzerService
-
-import hashlib
-from pathlib import Path
+from fastapi import UploadFile
 
 from model.DocumentMetadata import DocumentMetadata as DocumentMetadataModel
 from model.DocumentMetadata import DocumentAnalyseMetadata
 from model.MongoDocument import MongoDocument
 
 from model.GrottocenterType import GrottocenterType
-
-import time
-from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +47,6 @@ class DocumentService:
                 **shared_metadata,
                 "title": article.title,
                 "authors": article.authors,
-                "publication_date": article.publication_date or analysis.publication_date,
                 "grottocenter_type": GrottocenterType.ARTICLE,
                 "identifiers": [],
                 "parent": analysis.title,
@@ -69,15 +64,39 @@ class DocumentService:
         if file_content is None or len(file_content) == 0:
             raise ValueError("Uploaded file is empty")
 
-        documents_existing = self.mongo_repository.get_with_hash(self.get_file_hash(file_content))
+        file_hash = self.get_file_hash(file_content)
+        documents_existing = self.mongo_repository.get_with_hash(file_hash)
         if documents_existing:
             return {
                 "message": "success",
-                "filename": unique_filename,
-                "document_metadata": documents_existing
+                "filename": documents_existing[0].fileName,
+                "document_metadata": [
+                    document.metadata for document in documents_existing
+                ],
             }
-        
-        document_metadata = await self.analyze(file_content, unique_filename, file)
+
+        document_metadata = await self.analyze(
+            file_content,
+            unique_filename,
+            file.content_type or "application/pdf",
+        )
+
+        created_at = datetime.now(timezone.utc)
+        documents_to_insert = []
+        for metadata in document_metadata:
+            document = MongoDocument(
+                fileName=unique_filename,
+                hash=file_hash,
+                mimeType=file.content_type or "application/pdf",
+                createdAt=created_at,
+                model="GreenPT",
+                metadata=metadata,
+            )
+            document_data = document.model_dump(exclude={"metadata"})
+            document_data["metadata"] = metadata.model_dump(mode="json")
+            documents_to_insert.append(document_data)
+
+        self.mongo_repository.insert_many(documents_to_insert)
 
         logger.info("Processing document file %s", unique_filename)
 
@@ -87,11 +106,12 @@ class DocumentService:
             "document_metadata": document_metadata
         }
 
-    
-
-    async def analyze(self, unique_filename: str, file: UploadFile) -> dict:
-        file_content = await file.read()
-
+    async def analyze(
+        self,
+        file_content: bytes,
+        unique_filename: str,
+        content_type: str,
+    ) -> list[DocumentMetadataModel]:
         pdf = fitz.open(stream=file_content, filetype="pdf")
         document_text = "\n\n".join(
             f"--- Page {page_number} ---\n{page.get_text()}"
@@ -103,7 +123,11 @@ class DocumentService:
 
         if len(document_text) < 1000:
             logger.info("Using OCR for document file %s", unique_filename)
-            document_text += await self.analyzer_service.get_text_with_OCR(file)
+            ocr_text = await self.analyzer_service.get_text_with_OCR(
+                file_content,
+                unique_filename,
+            )
+            document_text = f"{document_text}\n\n{ocr_text}".strip()
 
         if not document_text.strip():
             raise ValueError("No text could be extracted from the PDF")
@@ -112,12 +136,13 @@ class DocumentService:
 
         document_metadata = self.map_document_analysis_to_metadata(document_analysis)
         for metadata in document_metadata:
-            metadata.formats = [file.content_type]
+            metadata.formats = [content_type]
             if not metadata.pages:
                 metadata.pages = str(page_count)
 
         return document_metadata
 
 
+    @staticmethod
     def get_file_hash(file_content: bytes) -> str:
         return hashlib.sha256(file_content).hexdigest()

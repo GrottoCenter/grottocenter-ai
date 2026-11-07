@@ -18,7 +18,7 @@ async def httpClient(app: FastAPI):
         headers={
             "Authorization": f"Bearer {settings.api_key}",
         },
-        timeout=60.0,
+        timeout=120.0,
     )
 
     app.state.greenpt_client = GreenPTClient(settings.greenpt_api_url, settings.api_key, http_client=http_client)

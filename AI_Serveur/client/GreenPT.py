@@ -6,9 +6,6 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 class Models(enum.Enum):
-    MISTRAL = "mistral-small-3.2-24b-instruct-2506"
-    GPT = "gpt-oss-120b"
-    GEMMA = "gemma-3-27b-it"
     GLM = "glm-5.3-flash"
 
 class ReasoningEffort(enum.Enum):
@@ -28,7 +25,7 @@ class GreenPTClient:
         prompt: str,
         system_prompt: str,
         model: Models,
-        max_tokens: int = 2000,
+        max_tokens: int = 5_000,
     ) -> dict[str, Any]:
         body = {
             "model": model.value,

@@ -12,6 +12,81 @@ MONGO_ADMIN_PASSWORD = os.getenv("MONGO_ADMIN_PASSWORD")
 MONGO_APP_USERNAME = os.getenv("MONGO_APP_USERNAME")
 MONGO_APP_PASSWORD = os.getenv("MONGO_APP_PASSWORD")
 
+DOCUMENTS_VALIDATOR = {
+    "$jsonSchema": {
+        "bsonType": "object",
+        "required": [
+            "fileName",
+            "hash",
+            "mimeType",
+            "createdAt",
+            "model",
+            "metadata",
+        ],
+        "properties": {
+            "fileName": {"bsonType": "string"},
+            "hash": {"bsonType": "string"},
+            "mimeType": {"bsonType": "string"},
+            "createdAt": {"bsonType": "date"},
+            "model": {"bsonType": "string"},
+            "metadata": {
+                "bsonType": "object",
+                "required": [
+                    "title",
+                    "authors",
+                    "publisher",
+                    "publication_date",
+                    "identifiers",
+                    "languages",
+                    "descriptions",
+                    "grottocenter_type",
+                    "rights",
+                    "formats",
+                    "sources",
+                    "parent",
+                    "pages",
+                ],
+                "properties": {
+                    "title": {"bsonType": ["string", "null"]},
+                    "authors": {
+                        "bsonType": "array",
+                        "items": {"bsonType": "string"},
+                    },
+                    "publisher": {"bsonType": ["string", "null"]},
+                    "publication_date": {"bsonType": ["string", "null"]},
+                    "identifiers": {
+                        "bsonType": "array",
+                        "items": {"bsonType": "string"},
+                    },
+                    "languages": {
+                        "bsonType": "array",
+                        "items": {"bsonType": "string"},
+                    },
+                    "descriptions": {
+                        "bsonType": "array",
+                        "items": {"bsonType": "string"},
+                    },
+                    "grottocenter_type": {"bsonType": ["string", "null"]},
+                    "rights": {
+                        "bsonType": "array",
+                        "items": {"bsonType": "string"},
+                    },
+                    "formats": {
+                        "bsonType": "array",
+                        "items": {"bsonType": "string"},
+                    },
+                    "sources": {
+                        "bsonType": "array",
+                        "items": {"bsonType": "string"},
+                    },
+                    "parent": {"bsonType": ["string", "null"]},
+                    "pages": {"bsonType": ["string", "null"]},
+                },
+            },
+        },
+    },
+}
+
 
 def validate_configuration() -> None:
     required_values = {
@@ -71,66 +146,32 @@ def initialize_database() -> None:
                 roles=[{"role": "readWrite", "db": DATABASE_NAME}],
             )
 
+        now = datetime.now(timezone.utc)
+        if "documents" in database.list_collection_names():
+            database.command(
+                "collMod",
+                "documents",
+                validator=DOCUMENTS_VALIDATOR,
+                validationLevel="strict",
+            )
+        else:
+            database.create_collection(
+                "documents",
+                validator=DOCUMENTS_VALIDATOR,
+            )
+
+        database["documents"].create_index(
+            [("createdAt", ASCENDING)], name="createdAt"
+        )
+        database["documents"].create_index(
+            [("hash", ASCENDING)], name="hash"
+        )
+
         if database["database_metadata"].find_one(
             {"_id": "initialization"}
         ):
             print(f"MongoDB already initialized: {DATABASE_NAME}")
             return
-
-        now = datetime.now(timezone.utc)
-
-        database.create_collection(
-            "documents",
-            validator={
-                "$jsonSchema": {
-                    "bsonType": "object",
-                    "required": ["fileName", "hash", "mimeType", "createdAt", "model", "metadata"],
-                    "properties": {
-                        "fileName": {"bsonType": "string"},
-                        "hash": {"bsonType": "string"},
-                        "mimeType": {"bsonType": "string"},
-                        "createdAt": {"bsonType": "date"},
-                        "model": {"bsonType": "string"},
-
-                        "metadata": {
-                            "bsonType": "object",
-                            "required": ["title", "authors", "publisher", "publicationDate", "languages", "license", "identifiers", "description", "rights"],
-                            "properties": {
-                                "title": {"bsonType": ["string", "null"]},
-                                "authors": {"bsonType": ["array", "null"], "items": {"bsonType": "string"}},
-                                "publisher": {"bsonType": ["string", "null"]},
-                                "publicationDate": {"bsonType": ["date", "null"]},
-                                "languages": {"bsonType": ["array", "null"], "items": {"bsonType": "string"}},
-                                "license": {"bsonType": ["string", "null"]},
-                                "identifiers": {"bsonType": ["array", "null"], "items": {"bsonType": "string"}},
-                                "description": {"bsonType": ["string", "null"]},
-                                "rights": {"bsonType": ["string", "null"]},
-                                "articles": {
-                                    "bsonType": "array",
-                                    "items": {
-                                        "bsonType": "object",
-                                        "required": ["title", "authors", "page_start", "page_end"],
-                                        "properties": {
-                                            "title": {"bsonType": ["string", "null"]},
-                                            "authors": {"bsonType": ["array", "null"], "items": {"bsonType": "string"}},
-                                            "page_start": {"bsonType": ["int", "null"]},
-                                            "page_end": {"bsonType": ["int", "null"]},
-                                        }
-                                    }
-                                }
-                            },
-                        },
-                    },
-                }
-            },
-        )
-
-        database["documents"].create_index(
-            [("created_at", ASCENDING)], name="created_at"
-        )
-        database["documents"].create_index(
-            [("hash", ASCENDING)], name="hash"
-        )
 
         database["database_metadata"].insert_one(
             {

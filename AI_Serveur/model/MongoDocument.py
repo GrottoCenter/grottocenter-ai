@@ -1,8 +1,8 @@
-from typing import List, Literal, Optional
+from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
-from AI_Serveur.model import DocumentMetadata
+from .DocumentMetadata import DocumentMetadata
 
 class MongoDocument(BaseModel):
 
@@ -25,8 +25,7 @@ class MongoDocument(BaseModel):
         description="MIME type of the file"
     )
 
-    createAt: str = Field(
-        default=None,
+    createdAt: datetime = Field(
         description="Creation date of the file"
     )
 

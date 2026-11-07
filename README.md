@@ -39,6 +39,10 @@ Available `.env` variables:
 | `AUTH_VERIFY_URL` | Grottocenter token verification endpoint | `http://localhost:1337/api/v1/auth/check` |
 
 Never commit `.env` or place a real secret in a tracked file.
+When running in Docker, this URL must point to an auth service reachable from
+the container. `localhost` refers to the backend container itself; the
+development Compose file uses `host.docker.internal` for an auth service on the
+host.
 
 ## Run with Docker
 
@@ -106,7 +110,10 @@ The response includes:
 - `document_metadata`: a list of normalized metadata objects.
 
 If the document is a journal issue, detected articles are converted into
-`article` documents with their title, authors and page ranges.
+`article` documents with their title, authors and page ranges. Each returned
+metadata object is stored in MongoDB with the uploaded file's hash and filename;
+re-uploading the same file returns the stored metadata instead of inserting it
+again.
 
 ## Project architecture
 
@@ -139,5 +146,5 @@ AI_Serveur/
    for OCR.
 5. Short documents are analyzed in one LLM call. Long documents are split into
    chunks, analyzed separately, and then merged.
-6. The GreenPT response is validated with Pydantic models and returned to the
-   client.
+6. The GreenPT response is validated with Pydantic models, stored in MongoDB,
+   and returned to the client.

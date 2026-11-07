@@ -18,8 +18,8 @@ class DocumentChunk(TypedDict):
 
 class LLMAnalyzerService:
 
-    SINGLE_CALL_TOKEN_LIMIT = 70_000
-    MAP_CHUNK_TOKEN_BUDGET = 50_000
+    SINGLE_CALL_TOKEN_LIMIT = 800_000
+    MAP_CHUNK_TOKEN_BUDGET = 400_000
 
     SCHEMA_BLOCK = json.dumps(
         DocumentAnalyseMetadata.model_json_schema(),
@@ -234,6 +234,8 @@ class LLMAnalyzerService:
         return result
 
 
-    async def get_text_with_OCR(self, file: UploadFile) -> str:
-        file_content = await self.greenpt_client.OCR_request(file, file.filename)
-        return file_content
+    async def get_text_with_OCR(self, pdf_content: bytes, filename: str) -> str:
+        ocr_result = await self.greenpt_client.OCR_request(pdf_content, filename)
+        if isinstance(ocr_result, str):
+            return ocr_result
+        return json.dumps(ocr_result, ensure_ascii=False)
