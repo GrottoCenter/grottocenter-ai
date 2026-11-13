@@ -7,7 +7,7 @@ services:
       - API_PORT=8000
       - GREENPT_API_URL=https://api.greenpt.ai/v1
       - GREENPT_API_KEY=${GREENPT_API_KEY}
-      - AUTH_VERIFY_URL=http://host.docker.internal:1337/api/v1/auth/check
+      - SSO_SALT_DOCUMENTS=${SSO_SALT_DOCUMENTS}
       - MONGO_URI=mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_DB_NAME}?authSource=${MONGO_DB_NAME}
       - MONGO_DB_NAME=${MONGO_DB_NAME}
       - MONGO_APP_USERNAME=${MONGO_APP_USERNAME}

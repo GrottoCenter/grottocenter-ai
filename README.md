@@ -11,13 +11,13 @@ compatible with Grottocenter documents.
 - metadata analysis with an LLM;
 - map-reduce processing for long documents;
 - detection of articles contained in a journal issue;
-- authentication token validation through Grottocenter.
+- short-lived SSO token validation for document analysis.
 
 ## Prerequisites
 
 - Docker and Docker Compose;
 - a GreenPT API key;
-- an accessible Grottocenter instance to validate tokens.
+- a shared SSO secret configured in both Grottocenter and this service.
 
 ## Configuration
 
@@ -36,18 +36,15 @@ Available `.env` variables:
 | --- | --- | --- |
 | `GREENPT_API_URL` | GreenPT API URL | `https://api.greenpt.ai/v1` |
 | `GREENPT_API_KEY` | GreenPT secret API key | `your-api-key` |
-| `AUTH_VERIFY_URL` | Grottocenter token verification endpoint | `http://localhost:1337/api/v1/auth/check` |
+| `SSO_SALT_DOCUMENTS` | Shared HS256 secret for document SSO; set the same value in Grottocenter | generated secret |
 
-Never commit `.env` or place a real secret in a tracked file.
-When running in Docker, this URL must point to an auth service reachable from
-the container. `localhost` refers to the backend container itself; the
-development Compose file uses `host.docker.internal` for an auth service on the
-host.
+Never commit `.env` or place a real secret in a tracked file. Configure
+`SSO_SALT_DOCUMENTS` in the Grottocenter API environment as well; do not use
+the Superset signing secret for document SSO.
 
 ## Run with Docker
 
-The `docker-compose.dev.yml` file uses the default GreenPT URL and connects to
-Grottocenter on the host machine (`host.docker.internal:1337`).
+The `docker-compose.dev.yml` file uses the default GreenPT URL.
 
 From the repository root, run:
 
@@ -140,7 +137,8 @@ AI_Serveur/
 ## Analysis workflow
 
 1. A request reaches `POST /documents/analyze` with a Bearer token.
-2. The token is verified through `AUTH_VERIFY_URL`.
+2. The token signature, expiry, and `documents` audience are verified using
+   `SSO_SALT_DOCUMENTS`.
 3. The PDF is read in memory and its text is extracted page by page.
 4. If the extracted text contains fewer than 1,000 characters, GreenPT is used
    for OCR.

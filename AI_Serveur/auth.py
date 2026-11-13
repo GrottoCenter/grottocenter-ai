@@ -1,5 +1,4 @@
-import httpx
-
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from config.settings import settings
@@ -12,30 +11,22 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing token",
         )
-    token = credentials.credentials
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                settings.auth_verify_url,
-                headers={"Authorization": f"Bearer {token}"},
-                timeout=10.0,
-            )
-    except httpx.RequestError as exc:
+    if not settings.sso_salt_documents:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Token verification service is unavailable",
+            detail="SSO token verification is not configured",
+        )
+
+    try:
+        return jwt.decode(
+            credentials.credentials,
+            settings.sso_salt_documents,
+            algorithms=["HS256"],
+            audience="documents",
+            options={"require": ["exp", "sub", "jti"], "verify_sub": False},
+        )
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
         ) from exc
-
-    if response.status_code != 200:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-        )
-
-    response_data = response.json()
-    if response_data.get("success") is not True:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-        )
-    return
