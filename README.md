@@ -211,7 +211,7 @@ container as it is and says so.
 
 | Secret | Value |
 | --- | --- |
-| `AI_VM_HOST` | Host name of the AI server VM, for example `grottocenter-ai.francecentral.cloudapp.azure.com` |
+| `AI_VM_HOST` | Host name of the AI server VM, for example `ai-vm.grottocenter.org` |
 | `AI_VM_USER` | The SSH user on the VM (it must be allowed to use Docker), `azureuser` |
 | `AI_VM_SSH_KEY` | The private half of a key made for this deployment only, without a passphrase |
 | `AI_VM_HOST_KEY` | The VM's host key line, used instead of `ssh-keyscan` so the workflow only talks to the real VM |
@@ -229,7 +229,7 @@ ssh-keygen -t ed25519 -N '' -C 'ai-server deploy' -f ./ai_deploy_key
 # prefixed with `restrict `, see "About the deploy key" below)
 
 # The host key line. It must name the same host as AI_VM_HOST.
-ssh-keyscan -t ed25519 grottocenter-ai.francecentral.cloudapp.azure.com > ai_vm_known_hosts
+ssh-keyscan -t ed25519 ai-vm.grottocenter.org > ai_vm_known_hosts
 ssh-keygen -lf ai_vm_known_hosts
 ```
 
@@ -242,7 +242,7 @@ host key and strict checking:
 
 ```bash
 ssh -i ./ai_deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=./ai_vm_known_hosts \
-  -o StrictHostKeyChecking=yes azureuser@grottocenter-ai.francecentral.cloudapp.azure.com \
+  -o StrictHostKeyChecking=yes azureuser@ai-vm.grottocenter.org \
   'docker version --format "{{.Server.Version}}" && echo OK'
 ```
 
