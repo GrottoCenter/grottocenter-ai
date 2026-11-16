@@ -40,6 +40,7 @@ Available `.env` variables:
 | `CORS_ORIGINS` | Comma-separated browser origins allowed to call the API. `*` is refused. Empty means no browser origin | `https://grottocenter.org` |
 | `LOG_LEVEL` | Log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL` (default `INFO`) | `INFO` |
 | `FORWARDED_ALLOW_IPS` | Proxies whose `X-Forwarded-For` uvicorn trusts; read by uvicorn itself (default `127.0.0.1,::1`) | `127.0.0.1` |
+| `AI_SERVER_PORT` | Host port the compose files publish the API on (default `8000`) | `8000` |
 | `ANALYZE_ENABLED` | Kill switch: `false` makes `POST /documents/analyze` answer 503 without redeploying (default `true`) | `true` |
 | `USER_DAILY_LIMIT` | Analyses one user may start per UTC day (default `5`) | `5` |
 | `USER_MAX_CONCURRENT` | Analyses one user may have running at once (default `2`) | `2` |
@@ -52,6 +53,8 @@ The server checks its settings at startup and refuses to start, listing every
 problem at once, when `MONGO_URI`, `MONGO_DB_NAME`, `GREENPT_API_KEY` or
 `SSO_SALT_DOCUMENTS` is missing, when the SSO secret is shorter than 32 bytes, or
 when `CORS_ORIGINS` contains `*`. The messages name the variables, never their values.
+
+The limit variables are passed to the container by both compose files with the defaults above.
 
 The limit variables must be integers between 1 and a sane maximum (`ANALYZE_ENABLED`
 must be `true` or `false`); the server refuses to start otherwise.
@@ -85,33 +88,54 @@ the Superset signing secret for document SSO.
 
 ## Run with Docker
 
-The `docker-compose.dev.yml` file uses the default GreenPT URL.
+Two compose files, for two purposes.
 
-From the repository root, run:
+### Local development: `docker-compose.dev.yml`
+
+Not for deployment. It mounts `AI_Serveur/` into the container and reloads the server
+when a file changes, logs at `DEBUG`, allows the local front-end origins
+(`http://localhost:3000` and `http://localhost:5173`) and publishes MongoDB on
+`127.0.0.1:27017` only.
+
+Put the variables from `.env.example` in a `.env` file first. In development,
+`SSO_SALT_DOCUMENTS` must be the value `grottocenter-api` signs with: when that API
+runs with `NODE_ENV=development` and no `SSO_SALT_DOCUMENTS` of its own, this is the
+`DEV_FALLBACK_SALT` constant in `api/services/SsoService.js`. Compose stops with a
+message when a required variable is missing.
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-The API is available at `http://localhost:8000`.
-
-Run the service in the background with:
+The API is then at `http://localhost:8000`. Other commands:
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build -d
-```
-
-View the logs:
-
-```bash
+docker compose -f docker-compose.dev.yml up --build -d   # in the background
 docker compose -f docker-compose.dev.yml logs -f backend
-```
-
-Stop the service:
-
-```bash
 docker compose -f docker-compose.dev.yml down
 ```
+
+### Production-like: `docker-compose.yml`
+
+Builds the image and runs it the way it runs in production: no source mounted, the
+root filesystem read-only (the application writes nothing to disk; `/tmp` is a tmpfs),
+no extra Linux capabilities, and MongoDB reachable only from the compose network, with
+no published port. The container runs as the unprivileged user `app` (uid 10001).
+
+```bash
+docker compose up --build -d
+```
+
+It publishes the API on `AI_SERVER_PORT` (default 8000) so the file can run on its own.
+On the Grottocenter VM the same services run behind Traefik instead; see
+`cloud_azure/worker_instance` in the private infrastructure repository.
+
+The image has a health check on `GET /ready`, so `docker compose ps` shows the backend
+as `unhealthy` when MongoDB cannot be reached. The `db-init` service is a one-shot job
+that creates the application user, the collections and their indexes, and exits.
+
+Database passwords go into the MongoDB connection URI: use URL-safe characters (for
+example `openssl rand -hex 24`).
 
 ## API
 

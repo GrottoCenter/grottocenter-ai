@@ -1,22 +1,40 @@
+# LOCAL DEVELOPMENT ONLY. Do not deploy this file.
+#
+# Differences from docker-compose.yml: the source is mounted and the server reloads
+# on change, logs are verbose, the browser origins are the local front-end dev
+# servers, and MongoDB is published on the loopback interface only.
+#
+# SSO_SALT_DOCUMENTS must match the secret grottocenter-api signs with. When that API
+# runs with NODE_ENV=development and no SSO_SALT_DOCUMENTS of its own, it uses the
+# DEV_FALLBACK_SALT constant in api/services/SsoService.js: put that value in your own
+# .env. It is not repeated here.
+
 services:
   backend:
     build: ./AI_Serveur
-    container_name: grottocenter-ai-serveur
+    image: ai-server:dev
+    # Same command as the image, plus --reload for the mounted source.
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--reload", "--reload-dir", "/app"]
     environment:
-      - API_HOST=0.0.0.0
-      - API_PORT=8000
-      - GREENPT_API_URL=https://api.greenpt.ai/v1
-      - GREENPT_API_KEY=${GREENPT_API_KEY}
-      - SSO_SALT_DOCUMENTS=${SSO_SALT_DOCUMENTS}
+      - GREENPT_API_URL=${GREENPT_API_URL:-https://api.greenpt.ai/v1}
+      - GREENPT_API_KEY=${GREENPT_API_KEY:?Set GREENPT_API_KEY in .env}
+      - SSO_SALT_DOCUMENTS=${SSO_SALT_DOCUMENTS:?Set SSO_SALT_DOCUMENTS in .env (the dev salt of grottocenter-api, at least 32 bytes)}
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
       - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
       - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-127.0.0.1}
-      - MONGO_URI=mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_DB_NAME}?authSource=${MONGO_DB_NAME}
+      - ANALYZE_ENABLED=${ANALYZE_ENABLED:-true}
+      - USER_DAILY_LIMIT=${USER_DAILY_LIMIT:-5}
+      - USER_MAX_CONCURRENT=${USER_MAX_CONCURRENT:-2}
+      - GLOBAL_DAILY_LIMIT=${GLOBAL_DAILY_LIMIT:-200}
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-50}
+      - MAX_PAGES=${MAX_PAGES:-300}
+      - MAX_LLM_CALLS=${MAX_LLM_CALLS:-10}
+      - MONGO_URI=mongodb://${MONGO_APP_USERNAME:?Set MONGO_APP_USERNAME in .env}:${MONGO_APP_PASSWORD:?Set MONGO_APP_PASSWORD in .env}@mongodb:27017/${MONGO_DB_NAME:?Set MONGO_DB_NAME in .env}?authSource=${MONGO_DB_NAME}
       - MONGO_DB_NAME=${MONGO_DB_NAME}
       - MONGO_APP_USERNAME=${MONGO_APP_USERNAME}
       - MONGO_APP_PASSWORD=${MONGO_APP_PASSWORD}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${AI_SERVER_PORT:-8000}:8000"
     volumes:
       - ./AI_Serveur:/app
     restart: unless-stopped
@@ -26,15 +44,17 @@ services:
 
   db-init:
     build: ./AI_Serveur
-    container_name: grottocenter-db-init
+    image: ai-server:dev
     environment:
       - MONGO_URI=mongodb://mongodb:27017
       - MONGO_DB_NAME=${MONGO_DB_NAME}
-      - MONGO_ADMIN_USERNAME=${MONGO_ROOT_USERNAME}
-      - MONGO_ADMIN_PASSWORD=${MONGO_ROOT_PASSWORD}
+      - MONGO_ADMIN_USERNAME=${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in .env}
+      - MONGO_ADMIN_PASSWORD=${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env}
       - MONGO_APP_USERNAME=${MONGO_APP_USERNAME}
       - MONGO_APP_PASSWORD=${MONGO_APP_PASSWORD}
     command: ["python", "scripts/init_db.py"]
+    healthcheck:
+      disable: true
     depends_on:
       mongodb:
         condition: service_healthy
@@ -42,12 +62,11 @@ services:
 
   mongodb:
     image: mongo:8.3.11
-    container_name: grottocenter-mongodb
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongodb_data:/data/db
     restart: unless-stopped
@@ -55,7 +74,7 @@ services:
       test: ["CMD-SHELL", "mongosh --quiet --eval \"db.runCommand({ ping: 1 }).ok\" localhost:27017/test | grep 1"]
       interval: 15s
       timeout: 5s
-      retries: 1
+      retries: 3
 
 volumes:
   mongodb_data:

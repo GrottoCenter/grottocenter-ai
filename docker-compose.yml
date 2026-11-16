@@ -1,55 +1,90 @@
+# Production-like stack: the image is built from AI_Serveur/, no source is mounted
+# and MongoDB is reachable only from the compose network.
+#
+# On the Grottocenter VM the same services run behind Traefik (see
+# cloud_azure/worker_instance in the private infra repository). The published
+# port below is only for running this file on its own.
+#
+# For local development use docker-compose.dev.yml instead.
+#
+# Required variables have no default and make `docker compose` stop with a message
+# when they are missing. See .env.example.
+
 services:
   backend:
     build: ./AI_Serveur
-    container_name: grottocenter-ai-serveur
+    image: ai-server
     environment:
-      - API_HOST=0.0.0.0
-      - API_PORT=8000
-      - GREENPT_API_URL=${GREENPT_API_URL}
-      - GREENPT_API_KEY=${GREENPT_API_KEY}
-      - SSO_SALT_DOCUMENTS=${SSO_SALT_DOCUMENTS}
+      - GREENPT_API_URL=${GREENPT_API_URL:-https://api.greenpt.ai/v1}
+      - GREENPT_API_KEY=${GREENPT_API_KEY:?Set GREENPT_API_KEY}
+      - SSO_SALT_DOCUMENTS=${SSO_SALT_DOCUMENTS:?Set SSO_SALT_DOCUMENTS (at least 32 bytes)}
       - CORS_ORIGINS=${CORS_ORIGINS:-https://grottocenter.org}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-127.0.0.1}
-      - MONGO_URI=mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_DB_NAME}?authSource=${MONGO_DB_NAME}
+      # Usage limits. Defaults here are the intended production values.
+      - ANALYZE_ENABLED=${ANALYZE_ENABLED:-true}
+      - USER_DAILY_LIMIT=${USER_DAILY_LIMIT:-5}
+      - USER_MAX_CONCURRENT=${USER_MAX_CONCURRENT:-2}
+      - GLOBAL_DAILY_LIMIT=${GLOBAL_DAILY_LIMIT:-200}
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-50}
+      - MAX_PAGES=${MAX_PAGES:-300}
+      - MAX_LLM_CALLS=${MAX_LLM_CALLS:-10}
+      - MONGO_URI=mongodb://${MONGO_APP_USERNAME:?Set MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD:?Set MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_DB_NAME:?Set MONGO_DB_NAME}?authSource=${MONGO_DB_NAME}
       - MONGO_DB_NAME=${MONGO_DB_NAME}
       - MONGO_APP_USERNAME=${MONGO_APP_USERNAME}
       - MONGO_APP_PASSWORD=${MONGO_APP_PASSWORD}
     ports:
-      - "8000:8000"
-    volumes:
-      - ./AI_Serveur:/app
+      - "${AI_SERVER_PORT:-8000}:8000"
+    # The application writes nothing to disk, so the root filesystem is read-only.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     restart: unless-stopped
     depends_on:
       db-init:
         condition: service_completed_successfully
 
+  # One-shot job: creates the application user, the collections and their indexes.
   db-init:
+    image: ai-server
     build: ./AI_Serveur
-    container_name: grottocenter-db-init
     environment:
       - MONGO_URI=mongodb://mongodb:27017
       - MONGO_DB_NAME=${MONGO_DB_NAME}
-      - MONGO_ADMIN_USERNAME=${MONGO_ROOT_USERNAME}
-      - MONGO_ADMIN_PASSWORD=${MONGO_ROOT_PASSWORD}
+      - MONGO_ADMIN_USERNAME=${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME}
+      - MONGO_ADMIN_PASSWORD=${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD}
       - MONGO_APP_USERNAME=${MONGO_APP_USERNAME}
       - MONGO_APP_PASSWORD=${MONGO_APP_PASSWORD}
     command: ["python", "scripts/init_db.py"]
+    # The image health check probes the API, which this job does not run.
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     depends_on:
       mongodb:
         condition: service_healthy
     restart: "no"
 
+  # No `ports:` on purpose: only the backend and db-init reach MongoDB.
   mongodb:
     image: mongo:8.3.11
-    container_name: grottocenter-mongodb
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-    ports:
-      - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval \"db.runCommand({ ping: 1 }).ok\" localhost:27017/test | grep 1"]
