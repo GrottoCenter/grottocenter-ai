@@ -308,6 +308,13 @@ GC_TOKEN=<your user token> scripts/smoke_test.sh   # no prompt
 scripts/smoke_test.sh --ocr --ssh-logs ~/.ssh/grottocenter_ai_ed25519
 ```
 
+To test with a real document, `scripts/smoke_candidates.sql` picks a few public PDFs from the
+Grottocenter database (run it on a read-only connection): validated documents with a validated
+PDF, under a licence that allows reuse (the text goes to GreenPT), of type Book, Issue, Article
+or Report, and not tied to a sensitive massif or entrance (a PDF can contain coordinates). It
+returns a few per type and size class with the title, licence and download URL. The file size
+is not in the database, so check it first with `curl -sI <url>`: the server refuses over 50 MB.
+
 | Option | Meaning |
 | --- | --- |
 | `--pdf FILE` | analyse this document instead of the synthetic one the script generates (new on every run, so each run really analyses) |
