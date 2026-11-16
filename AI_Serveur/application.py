@@ -14,9 +14,11 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from config.settings import resolve_log_level, settings
+from config.settings import UsageLimits, resolve_log_level, settings
 from controller.documentController import router as document_router
 from lifespan import build_lifespan
+from middleware import MaxBodySizeMiddleware
+from service.usageService import ConcurrencyLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,20 @@ def create_app(config=settings, mongo_client_factory=pymongo.MongoClient) -> Fas
         description="API pour les outils IA de traitement des documents Grottocenter",
         version="0.2.0",
         lifespan=build_lifespan(config, mongo_client_factory),
+    )
+
+    # What the routes need that does not depend on the lifespan. The concurrency limiter
+    # lives as long as the application, so it is shared by every request.
+    app.state.config = config
+    app.state.concurrency = ConcurrencyLimiter()
+
+    # An oversized upload is refused before it is read. Added before CORS so that the
+    # CORS middleware wraps it and the 413 still carries the CORS headers a browser
+    # needs to read it.
+    app.add_middleware(
+        MaxBodySizeMiddleware,
+        max_file_bytes=UsageLimits.from_config(config).max_file_size_bytes,
+        path="/documents/analyze",
     )
 
     # Browsers may only call this API from the listed origins. Authentication is a

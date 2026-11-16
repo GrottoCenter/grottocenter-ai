@@ -125,6 +125,18 @@ def connect_to_mongodb() -> MongoClient:
     raise RuntimeError("MongoDB is not available")
 
 
+def ensure_usage_indexes(database) -> None:
+    """Make MongoDB delete the per-day usage counters once their day is over.
+
+    The counters are documents of the `usage` collection (see repository/usage.py);
+    `expiresAt` is set to two days after the day they count. The `_id` index already
+    makes each counter unique. Safe to run any number of times.
+    """
+    database["usage"].create_index(
+        [("expiresAt", ASCENDING)], name="expiresAt_ttl", expireAfterSeconds=0
+    )
+
+
 def initialize_database() -> None:
     validate_configuration()
     client = connect_to_mongodb()
@@ -165,6 +177,7 @@ def initialize_database() -> None:
         database["documents"].create_index(
             [("hash", ASCENDING)], name="hash"
         )
+        ensure_usage_indexes(database)
 
         if database["database_metadata"].find_one(
             {"_id": "initialization"}
