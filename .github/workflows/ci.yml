@@ -6,12 +6,17 @@ on:
     branches:
       - develop
       - feat/analyse-document
+  # The deploy workflow runs the same checks before it ships anything.
+  workflow_call:
 
 permissions:
   contents: read
 
+# In a called workflow, github.workflow is the caller's name. Including it keeps a run
+# started by the deploy workflow from sharing a group with, and cancelling, the CI run
+# that the same push starts on its own.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

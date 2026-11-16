@@ -171,6 +171,91 @@ that creates the application user, the collections and their indexes, and exits.
 Database passwords go into the MongoDB connection URI: use URL-safe characters (for
 example `openssl rand -hex 24`).
 
+## Deployment
+
+`.github/workflows/deploy.yml` builds the image in CI and ships it to the Grottocenter VM
+(worker1) over SSH, with no registry, the same way as the OAI and Z3950 servers. The VM
+side (compose file, volumes, `.env`, Traefik, backups) is described in
+`cloud_azure/worker_instance` in the private infrastructure repository.
+
+The workflow runs on a push to `develop` that changes `AI_Serveur/**`, and by hand. The
+code lives on `feat/analyse-document` until it reaches `develop`, so until then:
+
+```bash
+gh workflow run deploy.yml --ref feat/analyse-document
+```
+
+A manual run deploys whatever branch you give it, so see the environment below.
+
+### What it does
+
+1. Runs the CI workflow (ruff and pytest). Nothing is shipped if it fails.
+2. Builds `ai-server` for `linux/amd64`.
+3. On the VM, tags the running image `ai-server:previous`, the rollback target.
+4. Ships the image with `docker save | bzip2 | ssh docker load`, and checks that the
+   image on the VM is the one that was built.
+5. Runs `db-init` with the new image (users, collections and indexes are applied on every
+   deploy), then `docker compose up -d --no-deps ai-server`.
+6. Waits up to 180 s for the container to be `healthy`. If it is not, it prints the last 50
+   log lines, puts `ai-server:previous` back, restarts it, and fails the job.
+
+On the very first deploy there is no previous image, so a failure leaves the new
+container as it is and says so.
+
+### Secrets
+
+| Secret | Value |
+| --- | --- |
+| `WORKER_HOST` | Host name of the VM, for example `worker1.grottocenter.org` |
+| `WORKER_USER` | The SSH user on the VM (it must be allowed to use Docker) |
+| `WORKER_SSH_KEY` | The private half of a key made for this deployment only, without a passphrase |
+| `WORKER_HOST_KEY` | The VM's host key line, used instead of `ssh-keyscan` so the workflow only talks to the real VM |
+
+Create the key and the host key line on your machine, once:
+
+```bash
+# A key used for nothing else, so it can be revoked on its own
+ssh-keygen -t ed25519 -N '' -C 'ai-server deploy' -f ./ai_deploy_key
+# Authorise it on the VM (append ai_deploy_key.pub to ~/.ssh/authorized_keys of WORKER_USER)
+
+# The host key line. It must name the same host as WORKER_HOST.
+ssh-keyscan -t ed25519 worker1.grottocenter.org
+```
+
+Do not trust the `ssh-keyscan` output blindly: compare its fingerprint with the one on the
+VM (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`, run there), then store the line as
+`WORKER_HOST_KEY`. Delete the local private key once it is stored.
+
+### Environment
+
+The deploy job uses the GitHub environment `worker1` (Settings, Environments). It is
+created on the first run, and it is the place to put the four secrets so that only this
+job can read them. Two settings are worth adding:
+
+- **Required reviewers**, so that nobody deploys to production without a second pair of
+  eyes.
+- **Deployment branches**, restricted to `develop` and `feat/analyse-document`, because a
+  manual run deploys the branch it is started from.
+
+### Rollback
+
+When a deploy fails its health check the workflow rolls back by itself. To go back to the
+previous image by hand, on the VM:
+
+```bash
+docker tag ai-server:previous ai-server
+docker compose -f services/docker-compose.yml up -d --no-deps ai-server
+```
+
+### About the deploy key
+
+The key can run commands on the VM as `WORKER_USER`, and being allowed to use Docker is
+equivalent to being root there, so treat it as a production credential. Limit the damage:
+use a dedicated key, a dedicated user, the `restrict` option in `authorized_keys` (no
+port, agent or X11 forwarding), and the environment protections above. A forced command
+that only accepts the workflow's operations would be stricter still, but the switch-over
+script is sent over SSH, so it would first have to live on the VM; that is not set up here.
+
 ## API
 
 ### Check that the server is running

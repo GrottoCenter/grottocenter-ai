@@ -1,0 +1,165 @@
+name: Deploy
+
+# Builds the image in CI and ships it to worker1 over SSH, with no registry: the same
+# pattern as the OAI and Z3950 servers. The VM side (compose file, volumes, .env) is
+# described in cloud_azure/worker_instance/README.md of the private infra repo.
+#
+# The code currently lives on `feat/analyse-document` and reaches `develop` later, so the
+# push trigger does nothing until then. In the meantime, deploy by hand:
+#   gh workflow run deploy.yml --ref feat/analyse-document
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'AI_Serveur/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Secrets can be stored on this environment, and the environment can require a
+    # reviewer and restrict the branches that may deploy (Settings > Environments).
+    environment: worker1
+    concurrency:
+      group: deploy-worker1
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+    env:
+      # The container's healthcheck runs every 30 s after a 30 s start period.
+      HEALTH_TIMEOUT_SECONDS: '180'
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build the image
+        id: build
+        run: |
+          docker build --platform linux/amd64 --tag ai-server AI_Serveur
+          echo "image_id=$(docker image inspect ai-server --format '{{.Id}}')" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        env:
+          WORKER_HOST: ${{ secrets.WORKER_HOST }}
+          WORKER_USER: ${{ secrets.WORKER_USER }}
+          WORKER_SSH_KEY: ${{ secrets.WORKER_SSH_KEY }}
+          WORKER_HOST_KEY: ${{ secrets.WORKER_HOST_KEY }}
+        run: |
+          for name in WORKER_HOST WORKER_USER WORKER_SSH_KEY WORKER_HOST_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The secret $name is not set"
+              exit 1
+            fi
+          done
+
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$WORKER_SSH_KEY" > ~/.ssh/worker1_key
+          # The pinned host key, never ssh-keyscan: a first connection that trusts
+          # whatever answers would defeat the point of checking the host.
+          printf '%s\n' "$WORKER_HOST_KEY" > ~/.ssh/worker1_known_hosts
+
+          if ! ssh-keygen -y -P '' -f ~/.ssh/worker1_key > /dev/null 2>&1; then
+            echo "::error::WORKER_SSH_KEY is not a usable private key (it must have no passphrase)"
+            exit 1
+          fi
+
+          cat > ~/.ssh/config <<EOF
+          Host worker1
+            HostName $WORKER_HOST
+            User $WORKER_USER
+            IdentityFile ~/.ssh/worker1_key
+            IdentitiesOnly yes
+            UserKnownHostsFile ~/.ssh/worker1_known_hosts
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ConnectTimeout 20
+            ServerAliveInterval 30
+            ServerAliveCountMax 6
+          EOF
+
+      - name: Keep the running image as the rollback target
+        # On the first deploy there is no image yet, hence the `|| true`.
+        run: ssh worker1 'docker tag ai-server ai-server:previous || true'
+
+      - name: Ship the image
+        run: docker save ai-server | bzip2 | ssh worker1 docker load
+
+      - name: Switch over and check health
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.image_id }}
+        run: |
+          ssh worker1 bash -s -- "$IMAGE_ID" "$HEALTH_TIMEOUT_SECONDS" <<'REMOTE'
+          set -uo pipefail
+
+          expected_id=$1
+          timeout=$2
+          interval=${3:-5}
+          compose=(docker compose -f services/docker-compose.yml)
+
+          rollback() {
+            if docker image inspect ai-server:previous > /dev/null 2>&1; then
+              echo "Rolling back to the previous image"
+              docker tag ai-server:previous ai-server
+              "${compose[@]}" up -d --no-deps ai-server || echo "The rollback could not restart ai-server"
+            else
+              echo "There is no previous image to roll back to (first deploy?)"
+            fi
+          }
+
+          loaded_id=$(docker image inspect ai-server --format '{{.Id}}')
+          if [ "$loaded_id" != "$expected_id" ]; then
+            echo "The image on the VM is not the one that was built"
+            rollback
+            exit 1
+          fi
+
+          # `run` starts MongoDB if it is down and runs the one-shot with the new image,
+          # so the indexes are applied on every deploy. `up` would not re-run an exited
+          # one-shot service, and the ai-server dependency on it is skipped by --no-deps.
+          echo "Applying the database setup"
+          if ! "${compose[@]}" run --rm -T db-init; then
+            echo "The database setup failed"
+            rollback
+            exit 1
+          fi
+
+          "${compose[@]}" up -d --no-deps ai-server || { rollback; exit 1; }
+
+          deadline=$((SECONDS + timeout))
+          while :; do
+            status=$(docker inspect --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' ai-server 2> /dev/null || echo missing)
+            if [ "$status" = "running healthy" ]; then
+              echo "ai-server is healthy"
+              docker image prune -f > /dev/null
+              exit 0
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              break
+            fi
+            sleep "$interval"
+          done
+
+          echo "ai-server was not healthy after ${timeout}s (last status: $status)"
+          echo "--- last 50 log lines"
+          docker logs --tail 50 ai-server 2>&1 || true
+          rollback
+          exit 1
+          REMOTE
+
+      - name: Remove the SSH material
+        if: always()
+        run: rm -f ~/.ssh/worker1_key ~/.ssh/worker1_known_hosts ~/.ssh/config
