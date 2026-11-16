@@ -297,6 +297,60 @@ port, agent or X11 forwarding), and the environment protections above. A forced 
 that only accepts the workflow's operations would be stricter still, but the switch-over
 script is sent over SSH, so it would first have to live on the VM; that is not set up here.
 
+## Smoke test
+
+`scripts/smoke_test.sh` checks a deployed server from the outside. It needs `bash`, `curl`
+and `python3` only. Run it after a deploy, from your own machine:
+
+```bash
+scripts/smoke_test.sh                        # asks for a Grottocenter email and password
+GC_TOKEN=<your user token> scripts/smoke_test.sh   # no prompt
+scripts/smoke_test.sh --ocr --ssh-logs ~/.ssh/grottocenter_ai_ed25519
+```
+
+| Option | Meaning |
+| --- | --- |
+| `--pdf FILE` | analyse this document instead of the synthetic one the script generates (new on every run, so each run really analyses) |
+| `--ocr` | also upload a tiny PDF, which goes through GreenPT's OCR (one more analysis) |
+| `--local` | `AI_URL` is a local http server: skip the TLS, redirect and closed-port checks |
+| `--ssh-logs KEYFILE` | read the server's logs over SSH (`SSH_TARGET`, default `azureuser@ai-vm.grottocenter.org`) and check them |
+| `AI_URL`, `API_URL`, `FRONT_ORIGIN` | the server, the Grottocenter API and the front origin to test CORS with (defaults are production) |
+
+What it checks:
+
+- **A, no login:** `/health` and `/ready` answer 200, the certificate verifies, `http` redirects
+  to `https`, a missing or forged token gets 401, the CORS preflight is allowed from the front
+  and not from another origin, and ports 8000 and 27017 do not answer from outside.
+- **B, with a login:** a token for another product (`superset`) is refused, a text file named
+  `.pdf` gets 415 or 422, a 52 MB upload gets 413, a real PDF is analysed (it prints the
+  duration, the number of documents and the first title), and the same PDF again returns an
+  identical result straight from storage.
+- **C, with `--ssh-logs`:** the last 300 log lines hold no JWT and no `Authorization` header, and
+  the second upload shows `source=storage` in its `analysis caller=...` line.
+
+The login prompts for an email and a password (and the one-time code if the account needs one),
+asks the Grottocenter API for a fresh 30-second token for each call, and never prints, stores or
+passes on a command line a token, a password or a code.
+
+**Cost and quota.** A default run starts one analysis (one GreenPT call), and `--ocr` starts one
+more. The repeat upload is served from storage and is free. Every analysis counts against the
+quota of the account you log in with (5 a day), so a few runs in one day can end in a 429 that
+the script explains.
+
+Exit code: `0` all checks passed, `1` at least one failed, `2` nothing failed but section B could
+not run (no login, no terminal).
+
+Not covered by default, to do by hand:
+
+- **Daily quota.** Lower `USER_DAILY_LIMIT` to `1` in the VM's `.env`, recreate the container
+  (`cd ~/services && docker compose up -d --no-deps ai-server`), run the script twice with the
+  same account: the second run's analysis must say 429. Put the limit back afterwards.
+- **Kill switch.** Set `ANALYZE_ENABLED=false` the same way: the analysis must say 503
+  ("temporarily disabled"). Put it back to `true`.
+- **A request over 2 minutes.** Run `scripts/smoke_test.sh --pdf BIG.pdf` with the largest real PDF
+  and read the duration it prints; it notes when a request took over 2 minutes and still went
+  through Traefik.
+
 ## API
 
 ### Check that the server is running
