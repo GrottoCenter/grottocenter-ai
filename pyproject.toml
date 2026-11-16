@@ -1,0 +1,24 @@
+[tool.ruff]
+# Set the maximum line length.
+line-length = 88
+# Match the Python version of AI_Serveur/Dockerfile.
+target-version = "py313"
+# `old/` is the previous Streamlit app, kept for reference only.
+extend-exclude = ["old"]
+
+[tool.ruff.lint]
+# Enable a broad set of rules for high-quality code.
+# E/F: Pyflakes and pycodestyle errors (essential)
+# W: Pycodestyle warnings
+# I: Isort (import sorting)
+# C90: McCabe complexity checks
+# N: Pep8-naming checks
+select = ["E", "F", "W", "I", "C90", "N"]
+
+# Ignore specific rules if needed. For example, to allow long docstrings and allow whitespaces:
+ignore = ["E501", "W291", "W293"]
+
+[tool.ruff.format]
+# Use double quotes for strings.
+quote-style = "double"
+

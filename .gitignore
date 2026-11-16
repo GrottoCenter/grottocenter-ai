@@ -1,54 +1,40 @@
-# Documentation
-README.md
-*.md
-docs/
-
 # Environment
 .env
 .env.local
 .env.*.local
 venv/
+.venv/
 env/
+
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.egg-info/
+build/
+dist/
 
-# IDE
+# Testing and reports
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+reports/
+
+# Logs and temporary files
+*.log
+logs/
+*.tmp
+*.temp
+*.bak
+*.backup
+.cache/
+
+# IDE and OS
 .vscode/
 .idea/
+*.iml
 *.swp
 *.swo
 *~
-
-# Logs
-*.log
-logs/
-
-# Temporary files
-*.tmp
-*.temp
-.cache/
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Build artifacts
-build/
-dist/
-*.egg-info/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Jupyter
-.ipynb_checkpoints/
-
-# Local uploads (will be mounted as volume)
-uploads/
-
-# Backup files
-*.bak
-*.backup

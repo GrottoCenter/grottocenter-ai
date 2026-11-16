@@ -1,15 +1,19 @@
+# Runtime dependencies only. Test and lint tools live in requirements-dev.txt.
+
 # Web framework (API)
 fastapi==0.135.2
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
+uvicorn[standard]==0.54.0
+python-multipart==0.0.34
 PyMuPDF==1.27.2.2
 
 # Validation de données
 pydantic==2.12.5
 
 # HTTP client
-httpx==0.24.1
-PyJWT==2.10.1
+httpx==0.28.1
+
+# Authentication (SSO token verification)
+PyJWT==2.15.1
 
 # MongoDB
-pymongo==4.15.1
+pymongo==4.20.0

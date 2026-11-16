@@ -1,0 +1,17 @@
+# The build context is AI_Serveur/, so this file lives here.
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+tests/
+reports/
+*.md
+*.log
+.git
+.gitignore
+.DS_Store
