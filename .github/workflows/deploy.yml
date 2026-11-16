@@ -27,8 +27,9 @@ jobs:
     needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Secrets can be stored on this environment, and the environment can require a
-    # reviewer and restrict the branches that may deploy (Settings > Environments).
+    # Secrets are stored on this environment, and it restricts the branches that may
+    # deploy (Settings > Environments). Required reviewers are not available: GitHub
+    # offers them on private repositories only with Enterprise, see the README.
     environment: worker1
     concurrency:
       group: deploy-worker1

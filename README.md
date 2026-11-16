@@ -230,12 +230,18 @@ VM (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`, run there), then store t
 
 The deploy job uses the GitHub environment `worker1` (Settings, Environments). It is
 created on the first run, and it is the place to put the four secrets so that only this
-job can read them. Two settings are worth adding:
+job can read them. Add one setting:
 
-- **Required reviewers**, so that nobody deploys to production without a second pair of
-  eyes.
 - **Deployment branches**, restricted to `develop` and `feat/analyse-document`, because a
   manual run deploys the branch it is started from.
+
+GitHub only offers **required reviewers** (an approval before each deploy) on private
+repositories with GitHub Enterprise. On the Team plan the API answers 422 "billing plan"
+when you ask for them, so there is no approval step: anyone who can push to a permitted
+branch, or run the workflow by hand, can deploy. The protections that remain are the
+branch restriction above, the deploy key being limited to this one VM, and the health
+check with automatic rollback. If an approval gate is wanted later, either upgrade the
+plan or protect `develop` so that it only changes through a reviewed pull request.
 
 ### Rollback
 
