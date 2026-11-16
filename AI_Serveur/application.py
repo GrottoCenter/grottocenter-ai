@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 from config.settings import UsageLimits, resolve_log_level, settings
 from controller.documentController import router as document_router
 from lifespan import build_lifespan
-from middleware import MaxBodySizeMiddleware
+from middleware import MaxBodySizeMiddleware, RequireValidTokenMiddleware
 from service.usageService import ConcurrencyLimiter
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,12 @@ def create_app(config=settings, mongo_client_factory=pymongo.MongoClient) -> Fas
         max_file_bytes=UsageLimits.from_config(config).max_file_size_bytes,
         path="/documents/analyze",
     )
+
+    # A request without a valid token is refused before its body is read. Added after the
+    # size limit, so it runs first (the last middleware added is the outermost): an
+    # anonymous caller learns nothing about the size limit and costs the server nothing.
+    # Still inside CORS, so the 401 carries the CORS headers a browser needs to read it.
+    app.add_middleware(RequireValidTokenMiddleware, path="/documents/analyze")
 
     # Browsers may only call this API from the listed origins. Authentication is a
     # bearer token, not a cookie, so credentials are not allowed. A wildcard is

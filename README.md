@@ -72,6 +72,12 @@ limits are what protects the GreenPT bill. `POST /documents/analyze` answers:
 | 429 | The user has `USER_MAX_CONCURRENT` analyses running (`Retry-After`: 10 s), or used `USER_DAILY_LIMIT` today (`Retry-After`: seconds until midnight UTC) |
 | 503 | `ANALYZE_ENABLED=false`, or `GLOBAL_DAILY_LIMIT` is reached (`Retry-After`: seconds until midnight UTC) |
 
+A request without a valid SSO token is answered 401 (or 503 if verification is not
+configured) before its body is read, so an anonymous caller cannot make the server receive
+an upload. `RequireValidTokenMiddleware` checks the token with the same function as the
+route (`auth.authenticate`), and runs before the size limit, so the 413 is only ever shown to
+authenticated callers.
+
 A file that was analysed before is answered from storage with no model call, so it
 uses no quota. Daily counts are kept in MongoDB (collection `usage`, removed by a TTL
 index that `scripts/init_db.py` creates), so a restart does not reset them. A count is
