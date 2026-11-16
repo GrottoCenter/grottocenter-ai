@@ -61,7 +61,10 @@ services:
     restart: "no"
 
   mongodb:
-    image: mongo:8.3.11
+    # MongoDB 7.0 (long-term support), not 8.x: MongoDB 8.0 and newer refuse to start on
+    # Linux kernels 6.19 and newer (SERVER-121912, a TCMalloc bug), which current Ubuntu
+    # cloud images ship. Revisit when MongoDB ships a fix.
+    image: mongo:7.0.48
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
