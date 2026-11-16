@@ -1,27 +1,14 @@
-from functools import lru_cache
-
-import pymongo
-
-from config.settings import settings
 from model.MongoDocument import MongoDocument
 
-
-@lru_cache(maxsize=1)
-def _get_database():
-    if not settings.mongo_uri:
-        raise RuntimeError("MONGO_URI is required to connect to MongoDB")
-    if not settings.mongo_db_name:
-        raise RuntimeError("MONGO_DB_NAME is required to select the MongoDB database")
-
-    client = pymongo.MongoClient(settings.mongo_uri)
-    return client[settings.mongo_db_name]
 
 class MongoRepository:
 
     COLLECTION_NAME = "documents"
 
-    def __init__(self, db=None):
-        self.db = db if db is not None else _get_database()
+    def __init__(self, db):
+        # The database comes from the application's lifespan (see lifespan.py),
+        # so there is one MongoDB client per process and it is closed on shutdown.
+        self.db = db
 
     def get_collection(self, collection_name):
         return self.db[collection_name]

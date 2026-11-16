@@ -36,7 +36,18 @@ Available `.env` variables:
 | --- | --- | --- |
 | `GREENPT_API_URL` | GreenPT API URL | `https://api.greenpt.ai/v1` |
 | `GREENPT_API_KEY` | GreenPT secret API key | `your-api-key` |
-| `SSO_SALT_DOCUMENTS` | Shared HS256 secret for document SSO; set the same value in Grottocenter | generated secret |
+| `SSO_SALT_DOCUMENTS` | Shared HS256 secret for document SSO, at least 32 bytes; set the same value in Grottocenter | generated secret |
+| `CORS_ORIGINS` | Comma-separated browser origins allowed to call the API. `*` is refused. Empty means no browser origin | `https://grottocenter.org` |
+| `LOG_LEVEL` | Log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL` (default `INFO`) | `INFO` |
+| `FORWARDED_ALLOW_IPS` | Proxies whose `X-Forwarded-For` uvicorn trusts; read by uvicorn itself (default `127.0.0.1,::1`) | `127.0.0.1` |
+
+The server checks its settings at startup and refuses to start, listing every
+problem at once, when `MONGO_URI`, `MONGO_DB_NAME`, `GREENPT_API_KEY` or
+`SSO_SALT_DOCUMENTS` is missing, when the SSO secret is shorter than 32 bytes, or
+when `CORS_ORIGINS` contains `*`. The messages name the variables, never their values.
+
+`GET /health` only says that the process is up. `GET /ready` also pings MongoDB
+and answers 503 when it is unreachable.
 
 Never commit `.env` or place a real secret in a tracked file. Configure
 `SSO_SALT_DOCUMENTS` in the Grottocenter API environment as well; do not use

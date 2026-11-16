@@ -8,6 +8,9 @@ services:
       - GREENPT_API_URL=https://api.greenpt.ai/v1
       - GREENPT_API_KEY=${GREENPT_API_KEY}
       - SSO_SALT_DOCUMENTS=${SSO_SALT_DOCUMENTS}
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-127.0.0.1}
       - MONGO_URI=mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_DB_NAME}?authSource=${MONGO_DB_NAME}
       - MONGO_DB_NAME=${MONGO_DB_NAME}
       - MONGO_APP_USERNAME=${MONGO_APP_USERNAME}

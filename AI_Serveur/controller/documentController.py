@@ -9,7 +9,7 @@ router = APIRouter(prefix="/documents", tags=["documents"], dependencies=[Depend
 
 def get_document_service(request: Request) -> DocumentService:
     analyzer_service = LLMAnalyzerService(request.app.state.greenpt_client)
-    return DocumentService(analyzer_service, MongoRepository())
+    return DocumentService(analyzer_service, MongoRepository(request.app.state.mongo_db))
 
 @router.post("/analyze")
 async def process_document(
