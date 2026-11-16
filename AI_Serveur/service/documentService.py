@@ -56,7 +56,10 @@ class DocumentService:
         return documents
     
     
-    async def process_document(self, file: UploadFile) -> dict:
+    async def process_document(
+        self, file: UploadFile, caller_id: int | str | None = None
+    ) -> dict:
+        started = time.perf_counter()
         unique_filename = str(UUID(int=time.time_ns())) + ".pdf"
 
         file_content = await file.read()
@@ -66,6 +69,9 @@ class DocumentService:
         file_hash = self.get_file_hash(file_content)
         documents_existing = self.mongo_repository.get_with_hash(file_hash)
         if documents_existing:
+            self._log_analysis(
+                caller_id, file_hash, file_content, started, source="storage"
+            )
             return {
                 "message": "success",
                 "filename": documents_existing[0].fileName,
@@ -98,6 +104,9 @@ class DocumentService:
         self.mongo_repository.insert_many(documents_to_insert)
 
         logger.info("Processing document file %s", unique_filename)
+        self._log_analysis(
+            caller_id, file_hash, file_content, started, source="analyzed"
+        )
 
         return {
             "message": "success", 
@@ -141,6 +150,33 @@ class DocumentService:
 
         return document_metadata
 
+
+    @staticmethod
+    def _log_analysis(
+        caller_id: int | str | None,
+        file_hash: str,
+        file_content: bytes,
+        started: float,
+        source: str,
+    ) -> None:
+        """One audit line per analysis: who, which file, how big, how long, from where.
+
+        Never receives the token, so it cannot log it. The page count is best effort
+        and must not turn a successful analysis into an error.
+        """
+        try:
+            with fitz.open(stream=file_content, filetype="pdf") as pdf:
+                pages = pdf.page_count
+        except Exception:
+            pages = None
+        logger.info(
+            "analysis caller=%s hash=%s pages=%s duration_ms=%d source=%s",
+            caller_id,
+            file_hash[:12],
+            pages,
+            (time.perf_counter() - started) * 1000,
+            source,
+        )
 
     @staticmethod
     def get_file_hash(file_content: bytes) -> str:

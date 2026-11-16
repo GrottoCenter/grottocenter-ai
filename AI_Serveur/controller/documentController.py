@@ -12,5 +12,10 @@ def get_document_service(request: Request) -> DocumentService:
     return DocumentService(analyzer_service, MongoRepository())
 
 @router.post("/analyze")
-async def process_document(file: UploadFile, service: DocumentService = Depends(get_document_service)):
-    return await service.process_document(file)
+async def process_document(
+    file: UploadFile,
+    caller: dict = Depends(verify_token),
+    service: DocumentService = Depends(get_document_service),
+):
+    # `caller` holds the verified SSO claims; `sub` is the Grottocenter user id.
+    return await service.process_document(file, caller_id=caller["sub"])

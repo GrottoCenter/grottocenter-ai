@@ -18,6 +18,10 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
             detail="SSO token verification is not configured",
         )
 
+    # Replay decision: there is deliberately no `jti` store. A token lives 30 s, travels
+    # over TLS, and the per-user quota is keyed on `sub`, so replaying a captured token
+    # never gives anyone more budget than its owner already has. `jti` is still required
+    # so every token stays unique and a store can be added later without reissuing tokens.
     try:
         return jwt.decode(
             credentials.credentials,
