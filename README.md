@@ -161,8 +161,8 @@ docker compose up --build -d
 ```
 
 It publishes the API on `AI_SERVER_PORT` (default 8000) so the file can run on its own.
-On the Grottocenter VM the same services run behind Traefik instead; see
-`cloud_azure/worker_instance` in the private infrastructure repository.
+On the dedicated AI server VM the same services run behind Traefik instead; see
+`cloud_azure/ai_vm` in the private infrastructure repository.
 
 The image has a health check on `GET /ready`, so `docker compose ps` shows the backend
 as `unhealthy` when MongoDB cannot be reached. The `db-init` service is a one-shot job
@@ -173,10 +173,15 @@ example `openssl rand -hex 24`).
 
 ## Deployment
 
-`.github/workflows/deploy.yml` builds the image in CI and ships it to the Grottocenter VM
-(worker1) over SSH, with no registry, the same way as the OAI and Z3950 servers. The VM
-side (compose file, volumes, `.env`, Traefik, backups) is described in
-`cloud_azure/worker_instance` in the private infrastructure repository.
+`.github/workflows/deploy.yml` builds the image in CI and ships it over SSH to the
+dedicated AI server VM (`grottocenter-ai`), with no registry, the same way as the OAI and
+Z3950 servers are deployed to their own VM. The VM side (creation, compose file, volumes,
+`.env`, Traefik, backups) is described in `cloud_azure/ai_vm/README.md` in the private
+infrastructure repository.
+
+The AI server has its own VM on purpose: it parses PDFs uploaded by any registered user,
+and the shared worker1 VM has no memory to spare next to the search index. The workflow
+refuses to run if the configured host is worker1.
 
 The workflow runs on a push to `develop` that changes `AI_Serveur/**`, and by hand. The
 code lives on `feat/analyse-document` until it reaches `develop`, so until then:
@@ -206,31 +211,50 @@ container as it is and says so.
 
 | Secret | Value |
 | --- | --- |
-| `WORKER_HOST` | Host name of the VM, for example `worker1.grottocenter.org` |
-| `WORKER_USER` | The SSH user on the VM (it must be allowed to use Docker) |
-| `WORKER_SSH_KEY` | The private half of a key made for this deployment only, without a passphrase |
-| `WORKER_HOST_KEY` | The VM's host key line, used instead of `ssh-keyscan` so the workflow only talks to the real VM |
+| `AI_VM_HOST` | Host name of the AI server VM, for example `grottocenter-ai.francecentral.cloudapp.azure.com` |
+| `AI_VM_USER` | The SSH user on the VM (it must be allowed to use Docker), `azureuser` |
+| `AI_VM_SSH_KEY` | The private half of a key made for this deployment only, without a passphrase |
+| `AI_VM_HOST_KEY` | The VM's host key line, used instead of `ssh-keyscan` so the workflow only talks to the real VM |
+
+Store them as secrets of the `ai-vm` environment (see below), not as repository secrets.
+The names differ from the earlier `WORKER_*` ones so that a leftover secret can never
+point a deploy at another VM.
 
 Create the key and the host key line on your machine, once:
 
 ```bash
 # A key used for nothing else, so it can be revoked on its own
 ssh-keygen -t ed25519 -N '' -C 'ai-server deploy' -f ./ai_deploy_key
-# Authorise it on the VM (append ai_deploy_key.pub to ~/.ssh/authorized_keys of WORKER_USER)
+# Authorise it on the VM (append ai_deploy_key.pub to ~/.ssh/authorized_keys of AI_VM_USER,
+# prefixed with `restrict `, see "About the deploy key" below)
 
-# The host key line. It must name the same host as WORKER_HOST.
-ssh-keyscan -t ed25519 worker1.grottocenter.org
+# The host key line. It must name the same host as AI_VM_HOST.
+ssh-keyscan -t ed25519 grottocenter-ai.francecentral.cloudapp.azure.com > ai_vm_known_hosts
+ssh-keygen -lf ai_vm_known_hosts
 ```
 
-Do not trust the `ssh-keyscan` output blindly: compare its fingerprint with the one on the
-VM (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`, run there), then store the line as
-`WORKER_HOST_KEY`. Delete the local private key once it is stored.
+Do not trust the `ssh-keyscan` output blindly: both the scan and the first connection come
+over the same network, so a matching fingerprint proves nothing. Log in with your own
+administrator key and read the fingerprint on the VM itself
+(`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`, run there). The two must be
+identical. Then test the deploy key the way the workflow will connect, with the pinned
+host key and strict checking:
+
+```bash
+ssh -i ./ai_deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=./ai_vm_known_hosts \
+  -o StrictHostKeyChecking=yes azureuser@grottocenter-ai.francecentral.cloudapp.azure.com \
+  'docker version --format "{{.Server.Version}}" && echo OK'
+```
+
+Store the key and the `ai_vm_known_hosts` file as `AI_VM_SSH_KEY` and `AI_VM_HOST_KEY`
+(`gh secret set AI_VM_SSH_KEY --env ai-vm -R <repo> < ./ai_deploy_key`), then delete the
+local private key. GitHub never shows a secret again.
 
 ### Environment
 
-The deploy job uses the GitHub environment `worker1` (Settings, Environments). It is
-created on the first run, and it is the place to put the four secrets so that only this
-job can read them. Add one setting:
+The deploy job uses the GitHub environment `ai-vm` (Settings, Environments). Create it
+before the first run, and put the four secrets on it so that only this job can read them.
+Add one setting:
 
 - **Deployment branches**, restricted to `develop` and `feat/analyse-document`, because a
   manual run deploys the branch it is started from.
@@ -255,7 +279,7 @@ docker compose -f services/docker-compose.yml up -d --no-deps ai-server
 
 ### About the deploy key
 
-The key can run commands on the VM as `WORKER_USER`, and being allowed to use Docker is
+The key can run commands on the VM as `AI_VM_USER`, and being allowed to use Docker is
 equivalent to being root there, so treat it as a production credential. Limit the damage:
 use a dedicated key, a dedicated user, the `restrict` option in `authorized_keys` (no
 port, agent or X11 forwarding), and the environment protections above. A forced command

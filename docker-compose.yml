@@ -2,7 +2,7 @@
 # and MongoDB is reachable only from the compose network.
 #
 # On the Grottocenter VM the same services run behind Traefik (see
-# cloud_azure/worker_instance in the private infra repository). The published
+# cloud_azure/ai_vm in the private infra repository). The published
 # port below is only for running this file on its own.
 #
 # For local development use docker-compose.dev.yml instead.

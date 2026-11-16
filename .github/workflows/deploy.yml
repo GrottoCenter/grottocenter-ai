@@ -1,8 +1,8 @@
 name: Deploy
 
-# Builds the image in CI and ships it to worker1 over SSH, with no registry: the same
+# Builds the image in CI and ships it to the dedicated AI server VM over SSH, with no registry: the same
 # pattern as the OAI and Z3950 servers. The VM side (compose file, volumes, .env) is
-# described in cloud_azure/worker_instance/README.md of the private infra repo.
+# described in cloud_azure/ai_vm/README.md of the private infra repo.
 #
 # The code currently lives on `feat/analyse-document` and reaches `develop` later, so the
 # push trigger does nothing until then. In the meantime, deploy by hand:
@@ -30,9 +30,9 @@ jobs:
     # Secrets are stored on this environment, and it restricts the branches that may
     # deploy (Settings > Environments). Required reviewers are not available: GitHub
     # offers them on private repositories only with Enterprise, see the README.
-    environment: worker1
+    environment: ai-vm
     concurrency:
-      group: deploy-worker1
+      group: deploy-ai-vm
       cancel-in-progress: false
     defaults:
       run:
@@ -54,37 +54,49 @@ jobs:
 
       - name: Configure SSH
         env:
-          WORKER_HOST: ${{ secrets.WORKER_HOST }}
-          WORKER_USER: ${{ secrets.WORKER_USER }}
-          WORKER_SSH_KEY: ${{ secrets.WORKER_SSH_KEY }}
-          WORKER_HOST_KEY: ${{ secrets.WORKER_HOST_KEY }}
+          AI_VM_HOST: ${{ secrets.AI_VM_HOST }}
+          AI_VM_USER: ${{ secrets.AI_VM_USER }}
+          AI_VM_SSH_KEY: ${{ secrets.AI_VM_SSH_KEY }}
+          AI_VM_HOST_KEY: ${{ secrets.AI_VM_HOST_KEY }}
         run: |
-          for name in WORKER_HOST WORKER_USER WORKER_SSH_KEY WORKER_HOST_KEY; do
+          for name in AI_VM_HOST AI_VM_USER AI_VM_SSH_KEY AI_VM_HOST_KEY; do
             if [ -z "${!name}" ]; then
               echo "::error::The secret $name is not set"
               exit 1
             fi
           done
 
+          # worker1 is the production search VM (its other names are CNAMEs to it). These
+          # secrets are for the AI server VM only, so a stale or mistyped AI_VM_HOST must
+          # never ship an image there.
+          host=$(printf '%s' "$AI_VM_HOST" | tr '[:upper:]' '[:lower:]')
+          host=${host%.}
+          case "$host" in
+            worker1|worker1.*|oai.grottocenter.org|z3950.grottocenter.org|search.grottocenter.org|20.199.9.62)
+              echo "::error::AI_VM_HOST points at worker1, the production search VM. It must be the dedicated AI server VM."
+              exit 1
+              ;;
+          esac
+
           umask 077
           mkdir -p ~/.ssh
-          printf '%s\n' "$WORKER_SSH_KEY" > ~/.ssh/worker1_key
+          printf '%s\n' "$AI_VM_SSH_KEY" > ~/.ssh/ai_vm_key
           # The pinned host key, never ssh-keyscan: a first connection that trusts
           # whatever answers would defeat the point of checking the host.
-          printf '%s\n' "$WORKER_HOST_KEY" > ~/.ssh/worker1_known_hosts
+          printf '%s\n' "$AI_VM_HOST_KEY" > ~/.ssh/ai_vm_known_hosts
 
-          if ! ssh-keygen -y -P '' -f ~/.ssh/worker1_key > /dev/null 2>&1; then
-            echo "::error::WORKER_SSH_KEY is not a usable private key (it must have no passphrase)"
+          if ! ssh-keygen -y -P '' -f ~/.ssh/ai_vm_key > /dev/null 2>&1; then
+            echo "::error::AI_VM_SSH_KEY is not a usable private key (it must have no passphrase)"
             exit 1
           fi
 
           cat > ~/.ssh/config <<EOF
-          Host worker1
-            HostName $WORKER_HOST
-            User $WORKER_USER
-            IdentityFile ~/.ssh/worker1_key
+          Host ai-vm
+            HostName $AI_VM_HOST
+            User $AI_VM_USER
+            IdentityFile ~/.ssh/ai_vm_key
             IdentitiesOnly yes
-            UserKnownHostsFile ~/.ssh/worker1_known_hosts
+            UserKnownHostsFile ~/.ssh/ai_vm_known_hosts
             StrictHostKeyChecking yes
             BatchMode yes
             ConnectTimeout 20
@@ -94,16 +106,16 @@ jobs:
 
       - name: Keep the running image as the rollback target
         # On the first deploy there is no image yet, hence the `|| true`.
-        run: ssh worker1 'docker tag ai-server ai-server:previous || true'
+        run: ssh ai-vm 'docker tag ai-server ai-server:previous || true'
 
       - name: Ship the image
-        run: docker save ai-server | bzip2 | ssh worker1 docker load
+        run: docker save ai-server | bzip2 | ssh ai-vm docker load
 
       - name: Switch over and check health
         env:
           IMAGE_ID: ${{ steps.build.outputs.image_id }}
         run: |
-          ssh worker1 bash -s -- "$IMAGE_ID" "$HEALTH_TIMEOUT_SECONDS" <<'REMOTE'
+          ssh ai-vm bash -s -- "$IMAGE_ID" "$HEALTH_TIMEOUT_SECONDS" <<'REMOTE'
           set -uo pipefail
 
           expected_id=$1
@@ -163,4 +175,4 @@ jobs:
 
       - name: Remove the SSH material
         if: always()
-        run: rm -f ~/.ssh/worker1_key ~/.ssh/worker1_known_hosts ~/.ssh/config
+        run: rm -f ~/.ssh/ai_vm_key ~/.ssh/ai_vm_known_hosts ~/.ssh/config
