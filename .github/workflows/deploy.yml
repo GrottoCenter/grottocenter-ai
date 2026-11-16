@@ -115,12 +115,17 @@ jobs:
         env:
           IMAGE_ID: ${{ steps.build.outputs.image_id }}
         run: |
-          ssh ai-vm bash -s -- "$IMAGE_ID" "$HEALTH_TIMEOUT_SECONDS" <<'REMOTE'
+          remote_log=$(mktemp)
+          ssh ai-vm bash -s -- "$IMAGE_ID" "$HEALTH_TIMEOUT_SECONDS" <<'REMOTE' | tee "$remote_log"
           set -uo pipefail
 
           expected_id=$1
           timeout=$2
           interval=${3:-5}
+          # This script arrives on stdin. A command that reads stdin (docker compose run
+          # does) would swallow the rest of it, and bash would then stop at the end of the
+          # input and still exit 0, so no docker command may read stdin.
+          docker() { command docker "$@" < /dev/null; }
           compose=(docker compose -f services/docker-compose.yml)
 
           rollback() {
@@ -158,6 +163,7 @@ jobs:
             if [ "$status" = "running healthy" ]; then
               echo "ai-server is healthy"
               docker image prune -f > /dev/null
+              echo "REMOTE_DEPLOY_OK"
               exit 0
             fi
             if [ "$SECONDS" -ge "$deadline" ]; then
@@ -172,6 +178,43 @@ jobs:
           rollback
           exit 1
           REMOTE
+
+          # The script above prints this line last, on success only. Its absence means the
+          # script stopped early, which must never count as a deploy.
+          if ! grep -qx 'REMOTE_DEPLOY_OK' "$remote_log"; then
+            echo "::error::The remote script ended without confirming the deploy"
+            exit 1
+          fi
+
+      - name: Confirm which container is running
+        env:
+          IMAGE_ID: ${{ steps.build.outputs.image_id }}
+        run: |
+          # A separate connection, with no script on stdin: what is running is read back
+          # from Docker, not from what the previous step claimed.
+          got=$(ssh ai-vm "docker inspect --format '{{.State.Status}} {{.State.Health.Status}} {{.Image}}' ai-server")
+          echo "ai-server: $got"
+          if [ "$got" != "running healthy $IMAGE_ID" ]; then
+            echo "::error::ai-server is not the image that was just built, running and healthy"
+            exit 1
+          fi
+
+      - name: Check the public endpoint
+        env:
+          PUBLIC_URL: https://ai.grottocenter.org
+        run: |
+          # Certificate verification stays on. Traefik requests the certificate once the
+          # container exists, so allow a few minutes after the first deploy.
+          for attempt in $(seq 1 12); do
+            if curl -fsS --max-time 10 "$PUBLIC_URL/ready" > /dev/null; then
+              echo "$PUBLIC_URL answers (attempt $attempt)"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::$PUBLIC_URL did not answer over HTTPS within 3 minutes"
+          ssh ai-vm 'docker logs --tail 30 traefik 2>&1' || true
+          exit 1
 
       - name: Remove the SSH material
         if: always()

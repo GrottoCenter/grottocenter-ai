@@ -203,9 +203,20 @@ A manual run deploys whatever branch you give it, so see the environment below.
    deploy), then `docker compose up -d --no-deps ai-server`.
 6. Waits up to 180 s for the container to be `healthy`. If it is not, it prints the last 50
    log lines, puts `ai-server:previous` back, restarts it, and fails the job.
+7. Checks the result twice more, because a green job must mean the new container is
+   serving: the remote script has to print `REMOTE_DEPLOY_OK` as its very last line (a
+   script that stops early, for example because a command swallowed its input, is a failed
+   deploy), then a separate SSH call reads back from Docker that `ai-server` is running,
+   healthy, and runs the image that was just built, and finally the runner requests
+   `https://ai.grottocenter.org/ready` with certificate verification on, retrying for up to
+   3 minutes (Traefik requests the certificate after the first healthy start).
 
 On the very first deploy there is no previous image, so a failure leaves the new
 container as it is and says so.
+
+The remote script reaches the VM on stdin, so a command inside it that reads stdin would
+swallow the rest of the script. Every `docker` call in it therefore runs with its input
+closed. Keep that in mind when adding commands to it.
 
 ### Secrets
 
