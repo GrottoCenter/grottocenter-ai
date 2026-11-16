@@ -27,5 +27,7 @@ class MongoRepository:
 
     def get_with_hash(self, file_hash: str) -> list[MongoDocument]:
         collection = self.get_collection(self.COLLECTION_NAME)
-        documents = collection.find({"hash": file_hash}, {"_id": 0})
+        # In upload order: the main document first, then its articles. Documents stored
+        # before `position` existed have none and keep the order they were inserted in.
+        documents = collection.find({"hash": file_hash}, {"_id": 0}).sort("position", 1)
         return [MongoDocument.model_validate(document) for document in documents]

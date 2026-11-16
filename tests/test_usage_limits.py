@@ -394,7 +394,7 @@ async def test_analysis_that_fails_in_greenpt_frees_its_slot_but_keeps_its_count
         served = await analyze(client, distinct_pdf(2))
         refused = await analyze(client, distinct_pdf(3))
 
-    assert failed.status_code == 500
+    assert failed.status_code == 502
     assert served.status_code == 200
     assert refused.status_code == 429  # the failed run used one of the two
     assert stored_counts(mongo)["user:42"] == 2

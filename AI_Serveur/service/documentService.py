@@ -8,13 +8,16 @@ from uuid import UUID
 
 import fitz
 from fastapi import HTTPException, UploadFile
+from pymongo.errors import BulkWriteError, DuplicateKeyError
 
 from config.settings import UsageLimits
+from errors import EmptyUploadError, NoTextError
 from model.DocumentMetadata import DocumentAnalyseMetadata
 from model.DocumentMetadata import DocumentMetadata as DocumentMetadataModel
 from model.GrottocenterType import GrottocenterType
 from model.MongoDocument import MongoDocument
 from repository.mongo import MongoRepository
+from service.analysisLocks import HashLocks
 from service.documentLlmAnalyzeService import LLMAnalyzerService
 from service.usageService import UsageService
 
@@ -24,6 +27,8 @@ READ_CHUNK_BYTES = 1024 * 1024
 # A PDF starts with this marker; readers accept it anywhere in the first kilobyte.
 PDF_SIGNATURE = b"%PDF-"
 PDF_SIGNATURE_WINDOW = 1024
+# MongoDB's error code for a unique index violation.
+DUPLICATE_KEY_CODE = 11000
 
 class DocumentService:
 
@@ -33,6 +38,7 @@ class DocumentService:
         mongo_repository: MongoRepository,
         usage: UsageService | None = None,
         limits: UsageLimits | None = None,
+        locks: HashLocks | None = None,
     ):
         self.analyzer_service = analyzer_service
         self.mongo_repository = mongo_repository
@@ -40,6 +46,10 @@ class DocumentService:
         # (see get_document_service); only unit tests build the service without it.
         self.usage = usage
         self.limits = limits or UsageLimits()
+        # The application shares one HashLocks between requests (see get_document_service);
+        # a service built alone gets its own, which only serialises that service's calls.
+        # `is not None`, not `or`: an empty HashLocks has a length of 0 and so is falsy.
+        self.locks = locks if locks is not None else HashLocks()
 
     @staticmethod
     def map_document_analysis_to_metadata(document_analysis: DocumentAnalyseMetadata | dict) -> list[DocumentMetadataModel]:
@@ -88,51 +98,68 @@ class DocumentService:
 
         file_content = await self._read_upload(file)
         if len(file_content) == 0:
-            raise ValueError("Uploaded file is empty")
+            raise EmptyUploadError()
         await asyncio.to_thread(self._validate_pdf, file_content)
 
         file_hash = self.get_file_hash(file_content)
-        documents_existing = await asyncio.to_thread(
-            self.mongo_repository.get_with_hash, file_hash
-        )
+
         # A file that was analysed before is answered from storage: no OCR, no LLM call,
         # so it uses neither quota nor a concurrency slot.
-        if documents_existing:
-            self._log_analysis(
-                caller_id, file_hash, file_content, started, source="storage"
-            )
-            return {
-                "message": "success",
-                "filename": documents_existing[0].fileName,
-                "document_metadata": [
-                    document.metadata for document in documents_existing
-                ],
-            }
+        stored = await self._stored_result(file_hash)
+        if stored:
+            self._log_analysis(caller_id, file_hash, file_content, started, source="storage")
+            return stored
 
-        metered = self.usage.metered(caller_id) if self.usage else nullcontext()
-        async with metered:
-            document_metadata = await self.analyze(
-                file_content,
-                unique_filename,
-                file.content_type or "application/pdf",
-            )
-
-            created_at = datetime.now(timezone.utc)
-            documents_to_insert = []
-            for metadata in document_metadata:
-                document = MongoDocument(
-                    fileName=unique_filename,
-                    hash=file_hash,
-                    mimeType=file.content_type or "application/pdf",
-                    createdAt=created_at,
-                    model="GreenPT",
-                    metadata=metadata,
+        # One analysis per file at a time. A request for a file that is being analysed waits
+        # here, then looks again: the first one has stored its result by the time the lock
+        # is free, so the second is answered from storage. The look has to come before the
+        # quota is charged, otherwise the waiting request would pay for nothing.
+        async with self.locks.hold(file_hash):
+            stored = await self._stored_result(file_hash)
+            if stored:
+                self._log_analysis(
+                    caller_id, file_hash, file_content, started, source="storage"
                 )
-                document_data = document.model_dump(exclude={"metadata"})
-                document_data["metadata"] = metadata.model_dump(mode="json")
-                documents_to_insert.append(document_data)
+                return stored
 
-            await asyncio.to_thread(self.mongo_repository.insert_many, documents_to_insert)
+            metered = self.usage.metered(caller_id) if self.usage else nullcontext()
+            raced = None
+            async with metered:
+                document_metadata = await self.analyze(
+                    file_content,
+                    unique_filename,
+                    file.content_type or "application/pdf",
+                )
+
+                created_at = datetime.now(timezone.utc)
+                documents_to_insert = []
+                # Position 0 is the file itself (or the issue); 1 to n are its articles.
+                for position, metadata in enumerate(document_metadata):
+                    document = MongoDocument(
+                        fileName=unique_filename,
+                        hash=file_hash,
+                        mimeType=file.content_type or "application/pdf",
+                        createdAt=created_at,
+                        model="GreenPT",
+                        metadata=metadata,
+                        position=position,
+                    )
+                    document_data = document.model_dump(exclude={"metadata"})
+                    document_data["metadata"] = metadata.model_dump(mode="json")
+                    documents_to_insert.append(document_data)
+
+                try:
+                    await asyncio.to_thread(
+                        self.mongo_repository.insert_many, documents_to_insert
+                    )
+                except (DuplicateKeyError, BulkWriteError) as error:
+                    raced = await self._stored_after_duplicate(file_hash, error)
+
+        if raced:
+            # Another instance stored this file while this one was analysing it (the lock
+            # only covers one process). Its result is what everybody is given.
+            self._log_analysis(caller_id, file_hash, file_content, started, source="storage")
+            return raced
 
         logger.info("Processing document file %s", unique_filename)
         self._log_analysis(
@@ -144,6 +171,47 @@ class DocumentService:
             "filename": unique_filename,
             "document_metadata": document_metadata
         }
+
+    async def _stored_result(self, file_hash: str) -> dict | None:
+        """The answer for a file that was analysed before, or None."""
+        documents = await asyncio.to_thread(
+            self.mongo_repository.get_with_hash, file_hash
+        )
+        if not documents:
+            return None
+        return {
+            "message": "success",
+            "filename": documents[0].fileName,
+            "document_metadata": [document.metadata for document in documents],
+        }
+
+    async def _stored_after_duplicate(self, file_hash: str, error: Exception) -> dict:
+        """What to answer when the insert hit the unique index: the result that is stored.
+
+        Anything that is not a duplicate key error, or a duplicate with nothing stored
+        behind it, is a real failure and is raised again.
+        """
+        if not self._is_duplicate_key_error(error):
+            raise error
+        stored = await self._stored_result(file_hash)
+        if stored is None:
+            raise error
+        logger.warning(
+            "analysis already stored by another writer hash=%s", file_hash[:12]
+        )
+        return stored
+
+    @staticmethod
+    def _is_duplicate_key_error(error: Exception) -> bool:
+        if isinstance(error, DuplicateKeyError):
+            return True
+        if isinstance(error, BulkWriteError):
+            write_errors = (error.details or {}).get("writeErrors", [])
+            return bool(write_errors) and all(
+                write_error.get("code") == DUPLICATE_KEY_CODE
+                for write_error in write_errors
+            )
+        return False
 
     async def analyze(
         self,
@@ -169,7 +237,7 @@ class DocumentService:
             document_text = f"{document_text}\n\n{ocr_text}".strip()
 
         if not document_text.strip():
-            raise ValueError("No text could be extracted from the PDF")
+            raise NoTextError()
 
         expected_calls = self._expected_llm_calls(document_text)
         if expected_calls > self.limits.max_llm_calls:

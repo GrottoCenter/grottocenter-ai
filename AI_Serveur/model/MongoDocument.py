@@ -39,3 +39,12 @@ class MongoDocument(BaseModel):
         default=None,
         description="Metadata associated with the file"
     )
+
+    position: int | None = Field(
+        default=None,
+        description=(
+            "Place of this document in the upload: 0 for the file itself (or the issue), "
+            "1 to n for the articles found in it. Documents stored before this field "
+            "existed have none."
+        ),
+    )

@@ -85,6 +85,34 @@ not given back when an analysis fails afterwards, because OCR and model calls ma
 already have been paid for. The concurrency count lives in memory and assumes a single
 instance.
 
+### Errors from the analysis
+
+Besides the limits above, `POST /documents/analyze` answers:
+
+| Status | When |
+| --- | --- |
+| 422 | The upload is empty, or no text could be extracted from the PDF (even by OCR) |
+| 502 | GreenPT answered with an error (any 4xx or 5xx, including a rejected key or its own rate limit), could not be reached, or answered something that is not JSON |
+| 504 | GreenPT did not answer within the client's timeout |
+| 500 | Anything else: a bug or an outage nobody planned for |
+
+The answer is always a short `{"detail": "..."}` and never contains what GreenPT said.
+A GreenPT 401 or 429 is a 502 here, so it cannot be mistaken for a problem with the
+caller's own token or quota. The cause is in the log (the status and the first 500
+characters of GreenPT's answer; for a 500, the traceback).
+
+### One analysis per file
+
+Two simultaneous uploads of the same file cost one analysis: the second waits for the
+first and is answered from storage, without using quota or a model call. This is a lock in
+the server process, so it assumes a single instance, like the concurrency limit. As a safety
+net for anything else that writes to the same database, `scripts/init_db.py` creates a unique
+index `hash_position_unique` on a file's hash and the `position` of each stored document
+(0 for the file or issue itself, 1 to n for its articles); a second writer gets the stored
+result instead of an error. Documents stored before `position` existed have none, and the
+index skips them. Re-run `db-init` (it is idempotent, and the compose files run it on every
+start) to create the index on an existing database.
+
 `GET /health` only says that the process is up. `GET /ready` also pings MongoDB
 and answers 503 when it is unreachable.
 

@@ -16,8 +16,10 @@ from fastapi.responses import JSONResponse
 
 from config.settings import UsageLimits, resolve_log_level, settings
 from controller.documentController import router as document_router
+from errors import install_error_handlers
 from lifespan import build_lifespan
 from middleware import MaxBodySizeMiddleware, RequireValidTokenMiddleware
+from service.analysisLocks import HashLocks
 from service.usageService import ConcurrencyLimiter
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,8 @@ def create_app(config=settings, mongo_client_factory=pymongo.MongoClient) -> Fas
     # lives as long as the application, so it is shared by every request.
     app.state.config = config
     app.state.concurrency = ConcurrencyLimiter()
+    app.state.analysis_locks = HashLocks()
+    install_error_handlers(app)
 
     # An oversized upload is refused before it is read. Added before CORS so that the
     # CORS middleware wraps it and the 413 still carries the CORS headers a browser

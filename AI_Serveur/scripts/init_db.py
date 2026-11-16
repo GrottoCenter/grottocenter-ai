@@ -28,6 +28,7 @@ DOCUMENTS_VALIDATOR = {
             "mimeType": {"bsonType": "string"},
             "createdAt": {"bsonType": "date"},
             "model": {"bsonType": "string"},
+            "position": {"bsonType": ["int", "long"]},
             "metadata": {
                 "bsonType": "object",
                 "required": [
@@ -125,6 +126,24 @@ def connect_to_mongodb() -> MongoClient:
     raise RuntimeError("MongoDB is not available")
 
 
+def ensure_document_indexes(database) -> None:
+    """Make MongoDB refuse a second copy of a file's analysis.
+
+    A file is identified by its hash, and each document stored for it by its `position`
+    (0 for the file or issue itself, 1 to n for its articles). The unique index is the
+    last line of defence against two analyses of the same file being stored, for example
+    by two server instances: inside one instance a lock already prevents it. Documents
+    stored before `position` existed have none, so the index skips them. Safe to run any
+    number of times.
+    """
+    database["documents"].create_index(
+        [("hash", ASCENDING), ("position", ASCENDING)],
+        name="hash_position_unique",
+        unique=True,
+        partialFilterExpression={"position": {"$exists": True}},
+    )
+
+
 def ensure_usage_indexes(database) -> None:
     """Make MongoDB delete the per-day usage counters once their day is over.
 
@@ -177,6 +196,7 @@ def initialize_database() -> None:
         database["documents"].create_index(
             [("hash", ASCENDING)], name="hash"
         )
+        ensure_document_indexes(database)
         ensure_usage_indexes(database)
 
         if database["database_metadata"].find_one(
