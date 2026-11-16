@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class TopLevelSubjectCode(str, Enum):
 
     KARSTOLOGY_AND_GEOSPELEOLOGY = "1"

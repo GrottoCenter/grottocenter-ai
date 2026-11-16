@@ -1,5 +1,5 @@
-from uuid import UUID
 from fastapi import APIRouter, Depends, Request, UploadFile
+
 from auth import verify_token
 from repository.mongo import MongoRepository
 from service.documentLlmAnalyzeService import LLMAnalyzerService

@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .DocumentMetadata import DocumentMetadata
 
+
 class MongoDocument(BaseModel):
 
     model_config = ConfigDict(

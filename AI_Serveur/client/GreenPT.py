@@ -1,7 +1,8 @@
 import enum
 import logging
-import httpx
 from typing import Any
+
+import httpx
 
 logger = logging.getLogger(__name__)
 

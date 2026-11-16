@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 import pymongo
+
 from config.settings import settings
 from model.MongoDocument import MongoDocument
 

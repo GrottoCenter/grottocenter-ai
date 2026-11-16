@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 
 from pymongo import ASCENDING, MongoClient
 
-
 MONGO_URI = os.getenv("MONGO_URI")
 DATABASE_NAME = os.getenv("MONGO_DB_NAME")
 MONGO_ADMIN_USERNAME = os.getenv("MONGO_ADMIN_USERNAME")

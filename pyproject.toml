@@ -5,6 +5,8 @@ line-length = 88
 target-version = "py313"
 # `old/` is the previous Streamlit app, kept for reference only.
 extend-exclude = ["old"]
+# The code uses top-level imports (`from client.GreenPT import ...`), so AI_Serveur/ is the source root.
+src = ["AI_Serveur", "."]
 
 [tool.ruff.lint]
 # Enable a broad set of rules for high-quality code.
@@ -18,7 +20,28 @@ select = ["E", "F", "W", "I", "C90", "N"]
 # Ignore specific rules if needed. For example, to allow long docstrings and allow whitespaces:
 ignore = ["E501", "W291", "W293"]
 
+[tool.ruff.lint.per-file-ignores]
+# Existing module, class and method names are part of the code base and of the Mongo
+# document schema; renaming them would change behaviour, so the naming rules are scoped off.
+"AI_Serveur/**" = ["N999"]  # PascalCase / camelCase module names (GreenPT.py, documentService.py, ...)
+"AI_Serveur/client/GreenPT.py" = ["N802"]  # OCR_request
+"AI_Serveur/client/HttpClient.py" = ["N802"]  # httpClient (lifespan factory)
+"AI_Serveur/service/documentLlmAnalyzeService.py" = ["N802"]  # get_text_with_OCR
+"AI_Serveur/config/settings.py" = ["N801"]  # `class settings`
+"AI_Serveur/model/MongoDocument.py" = ["N815"]  # fileName, mimeType, createdAt match the Mongo $jsonSchema
+
 [tool.ruff.format]
 # Use double quotes for strings.
 quote-style = "double"
 
+
+[tool.pytest.ini_options]
+# Tests live outside AI_Serveur/ so they stay out of the Docker build context.
+pythonpath = ["AI_Serveur", "."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    # PyMuPDF's SWIG bindings emit these three at import time; nothing we can act on.
+    "ignore:builtin type (SwigPyPacked|SwigPyObject|swigvarlink) has no __module__ attribute:DeprecationWarning",
+]

@@ -5,15 +5,14 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import fitz
-from repository.mongo import MongoRepository
-from service.documentLlmAnalyzeService import LLMAnalyzerService
 from fastapi import UploadFile
 
-from model.DocumentMetadata import DocumentMetadata as DocumentMetadataModel
 from model.DocumentMetadata import DocumentAnalyseMetadata
-from model.MongoDocument import MongoDocument
-
+from model.DocumentMetadata import DocumentMetadata as DocumentMetadataModel
 from model.GrottocenterType import GrottocenterType
+from model.MongoDocument import MongoDocument
+from repository.mongo import MongoRepository
+from service.documentLlmAnalyzeService import LLMAnalyzerService
 
 logger = logging.getLogger(__name__)
 

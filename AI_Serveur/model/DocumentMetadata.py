@@ -1,11 +1,10 @@
 from datetime import date
-from typing import List, Literal, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from model.GrottocenterType import GrottocenterType
 from model.LicenseName import LicenseName
-from model.TopLevelSubjectCode import TopLevelSubjectCode
 
 
 class ArticleMetadata(BaseModel):

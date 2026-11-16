@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class LicenseName(str, Enum):
 
     CC_BY_SA = "CC-BY-SA"

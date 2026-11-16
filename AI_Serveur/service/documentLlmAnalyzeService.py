@@ -4,8 +4,6 @@ import math
 import re
 from typing import Any, TypedDict
 
-from fastapi import UploadFile
-
 from client.GreenPT import Models
 from model.DocumentMetadata import DocumentAnalyseMetadata
 

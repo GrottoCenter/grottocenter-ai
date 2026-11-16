@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 
-from client.GreenPT import GreenPTClient
-from config.settings import settings
 import httpx
 from fastapi import FastAPI
+
+from client.GreenPT import GreenPTClient
+from config.settings import settings
 
 
 @asynccontextmanager
