@@ -192,7 +192,7 @@ class LLMAnalyzerService:
                 response = await self.greenpt_client.call_greenpt_chat(
                     prompt,
                     system_prompt=self.MAP_SYSTEM_PROMPT,
-                    model=Models.MISTRAL,
+                    model=Models.GLM,
                     max_tokens=2000,
                 )
 
@@ -213,7 +213,7 @@ class LLMAnalyzerService:
             reduce_response = await self.greenpt_client.call_greenpt_chat(
                 reduce_prompt,
                 system_prompt=self.REDUCE_SYSTEM_PROMPT,
-                model=Models.MISTRAL,
+                model=Models.GLM,
             )
             responses.append(reduce_response)
             result = self.parse_json_response(reduce_response)
