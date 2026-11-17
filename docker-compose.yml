@@ -19,6 +19,8 @@ services:
       - GREENPT_API_KEY=${GREENPT_API_KEY:?Set GREENPT_API_KEY}
       - SSO_SALT_DOCUMENTS=${SSO_SALT_DOCUMENTS:?Set SSO_SALT_DOCUMENTS (at least 32 bytes)}
       - CORS_ORIGINS=${CORS_ORIGINS:-https://grottocenter.org}
+      - CORS_ALLOW_LOCALHOST=${CORS_ALLOW_LOCALHOST:-false}
+      - CORS_ORIGIN_REGEX=${CORS_ORIGIN_REGEX:-}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-127.0.0.1}
       # Usage limits. Defaults here are the intended production values.

@@ -14,7 +14,12 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from config.settings import UsageLimits, resolve_log_level, settings
+from config.settings import (
+    UsageLimits,
+    build_origin_regex,
+    resolve_log_level,
+    settings,
+)
 from controller.documentController import router as document_router
 from errors import install_error_handlers
 from lifespan import build_lifespan
@@ -70,6 +75,12 @@ def create_app(config=settings, mongo_client_factory=pymongo.MongoClient) -> Fas
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(config.cors_origins),
+        # Developers' machines and the staging deployments, when configured: matched against
+        # the whole origin, and checked at startup so that they cannot become a wildcard.
+        allow_origin_regex=build_origin_regex(
+            getattr(config, "cors_allow_localhost", False),
+            getattr(config, "cors_origin_regex", ""),
+        ),
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],

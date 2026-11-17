@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from dataclasses import dataclass
 
 # PyJWT warns on HMAC keys shorter than the hash output (RFC 7518, section 3.2).
@@ -47,6 +48,49 @@ def parse_cors_origins(raw: str) -> list[str]:
     """
     origins = (origin.strip().rstrip("/") for origin in raw.split(","))
     return [origin for origin in origins if origin]
+
+
+# A browser origin is `scheme://host[:port]`, and the middleware matches the whole of it. This
+# one is a developer's own machine, on any port, over http or https.
+LOCALHOST_ORIGIN_REGEX = r"https?://(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]{1,5})?"
+MAX_ORIGIN_REGEX_LENGTH = 500
+# CORS_ORIGIN_REGEX must match none of these. A pattern that does is a wildcard in disguise,
+# and the usual way to write one by mistake is a pattern on a shared hosting domain with
+# a wildcard for the tenant.
+HOSTILE_SAMPLE_ORIGINS = (
+    "null",
+    "https://evil.example",
+    "http://evil.example",
+    "https://attacker.test",
+    "https://grottocenter.org.evil.example",
+    "http://localhost.evil.example",
+    "https://evil-tenant.westeurope.azurestaticapps.net",
+    "https://evil.azurewebsites.net",
+    "https://evil.github.io",
+    "https://evil.netlify.app",
+    "https://evil.vercel.app",
+    "https://evil.pages.dev",
+)
+
+
+def build_origin_regex(allow_localhost, pattern: str) -> str | None:
+    """The single pattern handed to the CORS middleware, or None when there is none.
+
+    Localhost (when switched on) and the configured pattern are alternatives. A pattern that
+    does not compile is left out here, because validate_settings reports it at startup and
+    the middleware must not fail on it first.
+    """
+    parts = []
+    if allow_localhost is True:
+        parts.append(LOCALHOST_ORIGIN_REGEX)
+    pattern = (pattern or "").strip() if isinstance(pattern, str) else ""
+    if pattern:
+        try:
+            re.compile(pattern)
+            parts.append(pattern)
+        except re.error:
+            pass
+    return "|".join(f"(?:{part})" for part in parts) if parts else None
 
 
 def parse_positive_int(name: str, default: int) -> int | None:
@@ -118,6 +162,8 @@ class settings:
     mongo_username = os.getenv("MONGO_APP_USERNAME", "").strip()
     mongo_db_name = os.getenv("MONGO_DB_NAME", "").strip()
     cors_origins = parse_cors_origins(os.getenv("CORS_ORIGINS", ""))
+    cors_allow_localhost = parse_bool("CORS_ALLOW_LOCALHOST", False)
+    cors_origin_regex = os.getenv("CORS_ORIGIN_REGEX", "").strip()
     log_level = os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO"
     analyze_enabled = parse_bool("ANALYZE_ENABLED", True)
     user_daily_limit = parse_positive_int("USER_DAILY_LIMIT", DEFAULT_USER_DAILY_LIMIT)
@@ -173,6 +219,40 @@ class UsageLimits:
         )
 
 
+def _cors_problems(config) -> list[str]:
+    problems = []
+    if "*" in getattr(config, "cors_origins", []):
+        problems.append(
+            "CORS_ORIGINS must not contain '*': list the allowed origins explicitly"
+        )
+    if not isinstance(getattr(config, "cors_allow_localhost", False), bool):
+        problems.append("CORS_ALLOW_LOCALHOST must be true or false")
+
+    pattern = getattr(config, "cors_origin_regex", "")
+    if not isinstance(pattern, str):
+        problems.append("CORS_ORIGIN_REGEX must be text")
+    elif pattern.strip():
+        problems.extend(_origin_regex_problems(pattern.strip()))
+    return problems
+
+
+def _origin_regex_problems(pattern: str) -> list[str]:
+    # Messages never contain the pattern: it is configuration, and the error text of the
+    # regular expression module would quote it.
+    if len(pattern) > MAX_ORIGIN_REGEX_LENGTH:
+        return [f"CORS_ORIGIN_REGEX must be at most {MAX_ORIGIN_REGEX_LENGTH} characters"]
+    try:
+        compiled = re.compile(pattern)
+    except re.error:
+        return ["CORS_ORIGIN_REGEX is not a valid regular expression"]
+    if any(compiled.fullmatch(origin) for origin in HOSTILE_SAMPLE_ORIGINS):
+        return [
+            "CORS_ORIGIN_REGEX is too permissive: it matches origins that must not be "
+            "allowed (any other site)"
+        ]
+    return []
+
+
 def _integer_problems(config) -> list[str]:
     problems = []
     for variable, attribute, default, maximum in INTEGER_SETTINGS:
@@ -206,10 +286,7 @@ def validate_settings(config=settings) -> list[str]:
             f"SSO_SALT_DOCUMENTS must be at least {MIN_SSO_SECRET_BYTES} bytes"
         )
 
-    if "*" in getattr(config, "cors_origins", []):
-        problems.append(
-            "CORS_ORIGINS must not contain '*': list the allowed origins explicitly"
-        )
+    problems.extend(_cors_problems(config))
 
     if getattr(config, "log_level", "INFO") not in LOG_LEVELS:
         problems.append(f"LOG_LEVEL must be one of {', '.join(LOG_LEVELS)}")

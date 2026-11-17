@@ -38,6 +38,8 @@ Available `.env` variables:
 | `GREENPT_API_KEY` | GreenPT secret API key | `your-api-key` |
 | `SSO_SALT_DOCUMENTS` | Shared HS256 secret for document SSO, at least 32 bytes; set the same value in Grottocenter | generated secret |
 | `CORS_ORIGINS` | Comma-separated browser origins allowed to call the API. `*` is refused. Empty means no browser origin | `https://grottocenter.org` |
+| `CORS_ALLOW_LOCALHOST` | `true` also allows a developer's machine: `localhost`, `127.0.0.1` and `[::1]`, on any port, over http or https (default `false`) | `true` |
+| `CORS_ORIGIN_REGEX` | A regular expression matched against the whole origin, for staging deployments whose address changes (default empty). Write it with `[0-9]` and `[.]` rather than `\d` and `\.` | `https://orange-rock-0d4f87503-[0-9]+[.]westeurope[.]azurestaticapps[.]net` |
 | `LOG_LEVEL` | Log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL` (default `INFO`) | `INFO` |
 | `FORWARDED_ALLOW_IPS` | Proxies whose `X-Forwarded-For` uvicorn trusts; read by uvicorn itself (default `127.0.0.1,::1`) | `127.0.0.1` |
 | `AI_SERVER_PORT` | Host port the compose files publish the API on (default `8000`) | `8000` |
@@ -54,6 +56,14 @@ The server checks its settings at startup and refuses to start, listing every
 problem at once, when `MONGO_URI`, `MONGO_DB_NAME`, `GREENPT_API_KEY` or
 `SSO_SALT_DOCUMENTS` is missing, when the SSO secret is shorter than 32 bytes, or
 when `CORS_ORIGINS` contains `*`. The messages name the variables, never their values.
+
+`CORS_ORIGIN_REGEX` is checked too: it must compile, be at most 500 characters, and match none of
+a set of unrelated origins (`https://evil.example`, another tenant of azurestaticapps.net, github.io,
+and so on). A pattern such as `.*`, or one that is a wildcard on a shared hosting domain, stops the
+server from starting, so it cannot silently become the wildcard that `CORS_ORIGINS` refuses.
+Browsers only call this API with a bearer token that the Grottocenter API issues for the user, and
+no cookie is involved, so allowing localhost or a staging address lets that origin make requests
+on behalf of a user who is logged in there, and nothing more.
 
 The limit variables are passed to the container by both compose files with the defaults above.
 
