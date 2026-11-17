@@ -48,6 +48,7 @@ Available `.env` variables:
 | `MAX_FILE_SIZE_MB` | Largest accepted upload (default `50`) | `50` |
 | `MAX_PAGES` | Most pages a PDF may have (default `300`) | `300` |
 | `MAX_LLM_CALLS` | Most model calls one document may need (default `10`) | `10` |
+| `QUOTA_EXEMPT_USER_IDS` | Grottocenter user ids with no daily quota, comma-separated (default empty: nobody) | `1,60181` |
 
 The server checks its settings at startup and refuses to start, listing every
 problem at once, when `MONGO_URI`, `MONGO_DB_NAME`, `GREENPT_API_KEY` or
@@ -60,6 +61,17 @@ The limit variables must be integers between 1 and a sane maximum (`ANALYZE_ENAB
 must be `true` or `false`); the server refuses to start otherwise.
 
 ### Cost and abuse limits
+
+The daily quota can be lifted for a few people with `QUOTA_EXEMPT_USER_IDS`, a comma-separated
+list of Grottocenter user ids (the `sub` of their token; ids match whole, so `1` does not
+exempt `10`). An exempt user has no daily quota and no counter, and every other limit still
+applies to them: their analyses count toward `GLOBAL_DAILY_LIMIT` (and are refused with 503
+once it is reached), they have the same concurrency cap, file size, page and model-call limits,
+and `ANALYZE_ENABLED=false` stops them too. Each exempt analysis is logged as
+`analysis quota exempt caller=<id>`. The variable is read at startup and checked: anything
+that is not a list of positive integers (or more than 50 ids) stops the server from starting.
+To change the list on the VM, edit `~/services/.env` and recreate the container with
+`docker compose up -d ai-server`.
 
 Anyone with a Grottocenter account may analyse a PDF and sign-up is open, so the
 limits are what protects the GreenPT bill. `POST /documents/analyze` answers:

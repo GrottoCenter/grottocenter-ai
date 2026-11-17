@@ -88,6 +88,7 @@ class UsageService:
         if caller_id is None:
             raise HTTPException(status_code=401, detail="The caller could not be identified")
         key = str(caller_id)
+        exempt = self.limits.is_exempt(caller_id)
 
         if not self.limiter.acquire(key, self.limits.user_max_concurrent):
             logger.warning("analysis refused caller=%s reason=concurrency", key)
@@ -100,12 +101,12 @@ class UsageService:
                 headers={"Retry-After": str(CONCURRENCY_RETRY_AFTER_SECONDS)},
             )
         try:
-            await self._consume_daily_counts(key)
+            await self._consume_daily_counts(key, exempt)
             yield
         finally:
             self.limiter.release(key)
 
-    async def _consume_daily_counts(self, key: str) -> None:
+    async def _consume_daily_counts(self, key: str, exempt: bool = False) -> None:
         now = self.clock()
         day = day_key(now)
         expires_at = datetime.combine(now.date(), time.min) + COUNTER_LIFETIME
@@ -114,22 +115,26 @@ class UsageService:
         user_counter = f"user:{key}:{day}"
         global_counter = f"global:{day}"
 
-        user_allowed = await asyncio.to_thread(
-            self.repository.consume,
-            user_counter,
-            self.limits.user_daily_limit,
-            {"scope": "user", "subject": key, "day": day, "expiresAt": expires_at},
-        )
-        if not user_allowed:
-            logger.warning("analysis refused caller=%s reason=daily_quota", key)
-            raise HTTPException(
-                status_code=429,
-                detail=(
-                    f"Daily analysis limit reached ({self.limits.user_daily_limit} per "
-                    "day). Try again after midnight UTC."
-                ),
-                headers={"Retry-After": retry_after},
+        if exempt:
+            # No user counter at all: there is no limit to count against.
+            logger.info("analysis quota exempt caller=%s", key)
+        else:
+            user_allowed = await asyncio.to_thread(
+                self.repository.consume,
+                user_counter,
+                self.limits.user_daily_limit,
+                {"scope": "user", "subject": key, "day": day, "expiresAt": expires_at},
             )
+            if not user_allowed:
+                logger.warning("analysis refused caller=%s reason=daily_quota", key)
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"Daily analysis limit reached ({self.limits.user_daily_limit} per "
+                        "day). Try again after midnight UTC."
+                    ),
+                    headers={"Retry-After": retry_after},
+                )
 
         global_allowed = await asyncio.to_thread(
             self.repository.consume,
@@ -139,7 +144,8 @@ class UsageService:
         )
         if not global_allowed:
             # The user was not served, so the quota they were just charged goes back.
-            await asyncio.to_thread(self.repository.release, user_counter)
+            if not exempt:
+                await asyncio.to_thread(self.repository.release, user_counter)
             logger.error("analysis refused caller=%s reason=global_cap", key)
             raise HTTPException(
                 status_code=503,

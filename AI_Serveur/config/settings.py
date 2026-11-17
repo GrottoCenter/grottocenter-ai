@@ -82,6 +82,33 @@ def resolve_log_level(name: str) -> int:
     return logging.getLevelNamesMapping().get(name.upper(), logging.INFO)
 
 
+# Few people are meant to be exempt from the daily quota (maintainers); more than this is
+# a typo or a paste of the wrong list.
+MAX_EXEMPT_USER_IDS = 50
+
+
+def parse_user_ids(name: str) -> frozenset[str] | None:
+    """User ids from a comma-separated environment variable, as strings of digits.
+
+    Empty or unset gives an empty set. None means the value is set but is not a list of
+    positive integers (or has too many): validate_settings reports it at startup, so a typo
+    never silently exempts, or fails to exempt, someone. Ids are compared as whole strings,
+    so 1 never matches 10.
+    """
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return frozenset()
+    ids = set()
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if not (part.isascii() and part.isdigit()) or int(part) < 1:
+            return None
+        ids.add(str(int(part)))
+    return frozenset(ids) if len(ids) <= MAX_EXEMPT_USER_IDS else None
+
+
 class settings:
     greenpt_api_url = os.getenv("GREENPT_API_URL", "https://api.greenpt.ai/v1")
     api_key = os.getenv("GREENPT_API_KEY", "").strip()
@@ -103,6 +130,7 @@ class settings:
     max_file_size_mb = parse_positive_int("MAX_FILE_SIZE_MB", DEFAULT_MAX_FILE_SIZE_MB)
     max_pages = parse_positive_int("MAX_PAGES", DEFAULT_MAX_PAGES)
     max_llm_calls = parse_positive_int("MAX_LLM_CALLS", DEFAULT_MAX_LLM_CALLS)
+    quota_exempt_user_ids = parse_user_ids("QUOTA_EXEMPT_USER_IDS")
 
 
 @dataclass(frozen=True)
@@ -120,6 +148,15 @@ class UsageLimits:
     max_file_size_mb: int = DEFAULT_MAX_FILE_SIZE_MB
     max_pages: int = DEFAULT_MAX_PAGES
     max_llm_calls: int = DEFAULT_MAX_LLM_CALLS
+    # Users with no daily quota. They still count toward the global cap and still have the
+    # concurrency cap, the size and page limits and the kill switch.
+    quota_exempt_user_ids: frozenset[str] = frozenset()
+
+    def is_exempt(self, caller_id) -> bool:
+        """True if the caller's whole user id is in the exempt list."""
+        if caller_id is None or not self.quota_exempt_user_ids:
+            return False
+        return str(caller_id).strip() in self.quota_exempt_user_ids
 
     @property
     def max_file_size_bytes(self) -> int:
@@ -134,6 +171,15 @@ class UsageLimits:
                 for name in cls.__dataclass_fields__
             }
         )
+
+
+def _integer_problems(config) -> list[str]:
+    problems = []
+    for variable, attribute, default, maximum in INTEGER_SETTINGS:
+        value = getattr(config, attribute, default)
+        if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
+            problems.append(f"{variable} must be an integer between 1 and {maximum}")
+    return problems
 
 
 def validate_settings(config=settings) -> list[str]:
@@ -171,9 +217,13 @@ def validate_settings(config=settings) -> list[str]:
     if not isinstance(getattr(config, "analyze_enabled", True), bool):
         problems.append("ANALYZE_ENABLED must be true or false")
 
-    for variable, attribute, default, maximum in INTEGER_SETTINGS:
-        value = getattr(config, attribute, default)
-        if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
-            problems.append(f"{variable} must be an integer between 1 and {maximum}")
+    problems.extend(_integer_problems(config))
+
+    exempt = getattr(config, "quota_exempt_user_ids", frozenset())
+    if not isinstance(exempt, (set, frozenset)):
+        problems.append(
+            "QUOTA_EXEMPT_USER_IDS must be a comma-separated list of user ids "
+            f"(positive integers, at most {MAX_EXEMPT_USER_IDS})"
+        )
 
     return problems
