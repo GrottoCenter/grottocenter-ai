@@ -1,8 +1,16 @@
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from api_docs import (
+    ANALYZE_DESCRIPTION,
+    ANALYZE_OPERATION_ID,
+    ANALYZE_RESPONSES,
+    ANALYZE_SUMMARY,
+    AnalyzeUpload,
+)
 from auth import verify_token
 from config.settings import UsageLimits
 from errors import INTERNAL_ERROR_MESSAGE, InvalidDocumentError, UpstreamError
@@ -27,15 +35,21 @@ def get_document_service(request: Request) -> DocumentService:
         locks=state.analysis_locks,
     )
 
-@router.post("/analyze")
+@router.post(
+    "/analyze",
+    operation_id=ANALYZE_OPERATION_ID,
+    summary=ANALYZE_SUMMARY,
+    description=ANALYZE_DESCRIPTION,
+    responses=ANALYZE_RESPONSES,
+)
 async def process_document(
-    file: UploadFile,
+    upload: Annotated[AnalyzeUpload, Form()],
     caller: dict = Depends(verify_token),
     service: DocumentService = Depends(get_document_service),
 ):
     # `caller` holds the verified SSO claims; `sub` is the Grottocenter user id.
     try:
-        return await service.process_document(file, caller_id=caller["sub"])
+        return await service.process_document(upload.file, caller_id=caller["sub"])
     except (StarletteHTTPException, InvalidDocumentError, UpstreamError):
         raise  # already an accurate answer: the status is part of the error
     except Exception as error:

@@ -40,4 +40,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # One worker. --proxy-headers makes the client address come from X-Forwarded-For
 # behind Traefik, but only for peers listed in FORWARDED_ALLOW_IPS, which uvicorn
 # reads from the environment (default 127.0.0.1,::1).
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--no-server-header"]

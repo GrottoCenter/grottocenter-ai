@@ -8,6 +8,7 @@ its body may quote the document or its own internals.
 import logging
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,20 @@ logger = logging.getLogger(__name__)
 UPSTREAM_FAILED_MESSAGE = "The analysis service failed. Try again later."
 UPSTREAM_TIMEOUT_MESSAGE = "The analysis service did not answer in time. Try again later."
 INTERNAL_ERROR_MESSAGE = "Internal server error"
+
+
+def describe_invalid_request(error: RequestValidationError) -> str:
+    """One line for a request that does not match the endpoint: which field, and what is wrong.
+
+    Written from the field name and the validator's short message only. The validator's
+    own answer carries the type of error and a link to its documentation, which would
+    name the library behind the API.
+    """
+    problems = []
+    for entry in error.errors():
+        field = ".".join(str(part) for part in entry["loc"] if part != "body")
+        problems.append(f"{field}: {entry['msg']}" if field else str(entry["msg"]))
+    return "Invalid request: " + "; ".join(problems)
 
 
 class InvalidDocumentError(ValueError):
@@ -54,6 +69,12 @@ class UpstreamTimeoutError(UpstreamError):
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, error: RequestValidationError):
+        return JSONResponse(
+            status_code=422, content={"detail": describe_invalid_request(error)}
+        )
+
     @app.exception_handler(InvalidDocumentError)
     async def invalid_document(request: Request, error: InvalidDocumentError):
         return JSONResponse(status_code=422, content={"detail": str(error)})

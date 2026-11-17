@@ -2,9 +2,15 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from api_docs import BEARER_DESCRIPTION, BEARER_SCHEME_NAME
 from config.settings import settings
 
-security = HTTPBearer(auto_error=False)
+security = HTTPBearer(
+    scheme_name=BEARER_SCHEME_NAME,
+    description=BEARER_DESCRIPTION,
+    bearerFormat="JWT",
+    auto_error=False,
+)
 
 
 class AuthError(Exception):

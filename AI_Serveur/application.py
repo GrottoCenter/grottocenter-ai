@@ -14,6 +14,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from api_docs import API_DESCRIPTION, API_TITLE, API_VERSION
 from config.settings import (
     UsageLimits,
     build_origin_regex,
@@ -21,6 +22,7 @@ from config.settings import (
     settings,
 )
 from controller.documentController import router as document_router
+from docs_ui import install_docs
 from errors import install_error_handlers
 from lifespan import build_lifespan
 from middleware import MaxBodySizeMiddleware, RequireValidTokenMiddleware
@@ -41,9 +43,13 @@ def configure_logging(level_name: str) -> None:
 
 def create_app(config=settings, mongo_client_factory=pymongo.MongoClient) -> FastAPI:
     app = FastAPI(
-        title="Grottocenter AI Tools API",
-        description="API pour les outils IA de traitement des documents Grottocenter",
-        version="0.2.0",
+        title=API_TITLE,
+        description=API_DESCRIPTION,
+        version=API_VERSION,
+        # The documentation page is ours (docs_ui.py): the stock pages load their files from a
+        # CDN and name the framework. ReDoc is not offered.
+        docs_url=None,
+        redoc_url=None,
         lifespan=build_lifespan(config, mongo_client_factory),
     )
 
@@ -86,15 +92,15 @@ def create_app(config=settings, mongo_client_factory=pymongo.MongoClient) -> Fas
         allow_headers=["Authorization", "Content-Type"],
     )
 
-    @app.get("/")
+    @app.get("/", include_in_schema=False)
     async def root():
         return {
-            "message": "Grottocenter AI Tools API",
-            "version": "0.2.0",
+            "message": API_TITLE,
+            "version": API_VERSION,
             "status": "running"
         }
 
-    @app.get("/health")
+    @app.get("/health", include_in_schema=False)
     async def health_check():
         """Liveness: the process answers. No I/O, so it never depends on MongoDB."""
         return {
@@ -102,7 +108,7 @@ def create_app(config=settings, mongo_client_factory=pymongo.MongoClient) -> Fas
             "message": "API is running",
         }
 
-    @app.get("/ready")
+    @app.get("/ready", include_in_schema=False)
     async def readiness_check(request: Request):
         """Readiness: MongoDB answers a ping."""
         try:
@@ -117,5 +123,6 @@ def create_app(config=settings, mongo_client_factory=pymongo.MongoClient) -> Fas
             )
         return {"status": "ok", "message": "API is ready"}
 
+    install_docs(app)
     app.include_router(document_router)
     return app
