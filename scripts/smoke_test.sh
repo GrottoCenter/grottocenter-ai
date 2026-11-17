@@ -319,6 +319,30 @@ if [ "$code" = 200 ]; then pass "GET /health" "200"; else fail "GET /health" "HT
 code=$(status_of "$AI_URL/ready")
 if [ "$code" = 200 ]; then pass "GET /ready" "200 (MongoDB answers)"; else fail "GET /ready" "HTTP $code"; fi
 
+# Answers carry no `server` header, which would name the HTTP server behind the API.
+headers=$(curl -sS -D - -o /dev/null --max-time 20 "$AI_URL/health" 2> /dev/null || true)
+if printf '%s' "$headers" | grep -qi '^server:'; then
+  fail "no server header" "$(printf '%s' "$headers" | grep -i '^server:' | tr -d '\r')"
+else
+  pass "no server header" "none sent"
+fi
+
+# The public documentation: the document and the page name neither the application nor
+# the framework, and the page loads its files from this server only.
+docs_bad=""
+for path in /openapi.json /docs; do
+  if curl -sS --max-time 20 "$AI_URL$path" 2> /dev/null | grep -qiE 'fastapi|starlette|pydantic|uvicorn|tiangolo|jsdelivr|AI Tools'; then
+    docs_bad="$docs_bad $path"
+  fi
+done
+docs_status=$(status_of "$AI_URL/docs")
+external=$(curl -sS --max-time 20 "$AI_URL/docs" 2> /dev/null | grep -oE '(src|href)="https?://[^"]*"' | tr '\n' ' ' || true)
+if [ "$docs_status" = 200 ] && [ -z "$docs_bad" ] && [ -z "$external" ]; then
+  pass "public documentation" "/docs and /openapi.json: no framework name, nothing loaded from another host"
+else
+  fail "public documentation" "/docs HTTP $docs_status, names found in:${docs_bad:- none}, external references: ${external:-none}"
+fi
+
 if [ "$LOCAL" = 0 ]; then
   verify=$(curl -sS -o /dev/null --max-time 20 -w '%{ssl_verify_result}' "$AI_URL/health" 2> /dev/null || true)
   if [ "$verify" = 0 ]; then pass "TLS certificate verifies" "no -k needed"; else fail "TLS certificate verifies" "ssl_verify_result=${verify:-none} (0 means valid)"; fi

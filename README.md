@@ -349,9 +349,11 @@ For the capacity check of the VM, `scripts/largest_candidates.sql` lists the 20 
 
 What it checks:
 
-- **A, no login:** `/health` and `/ready` answer 200, the certificate verifies, `http` redirects
-  to `https`, a missing or forged token gets 401, the CORS preflight is allowed from the front
-  and not from another origin, and ports 8000 and 27017 do not answer from outside.
+- **A, no login:** `/health` and `/ready` answer 200, answers carry no `server` header, the public
+  documentation names no framework and loads nothing from another host, the certificate
+  verifies, `http` redirects to `https`, a missing or forged token gets 401, the CORS preflight
+  is allowed from the front and not from another origin, and ports 8000 and 27017 do not
+  answer from outside.
 - **B, with a login:** a token for another product (`superset`) is refused, a text file named
   `.pdf` gets 415 or 422, an upload just over `MAX_FILE_SIZE_MB` gets 413, a real PDF is analysed (it prints the
   duration, the number of documents and the first title), and the same PDF again returns an
@@ -421,6 +423,30 @@ If the document is a journal issue, detected articles are converted into
 metadata object is stored in MongoDB with the uploaded file's hash and filename;
 re-uploading the same file returns the stored metadata instead of inserting it
 again.
+
+### API documentation
+
+The documentation is public on purpose, so that front-end developers can build against it
+without reading the code:
+
+- `GET /docs`: the interactive page (Swagger UI, "Try it out" included once you authorize with
+  a token).
+- `GET /openapi.json`: the OpenAPI document. It describes `POST /documents/analyze` with the
+  schema of the 200 answer (and an example), and every error it can return: 401, 413, 415, 422,
+  429 and 503 (both with `Retry-After`), 500, 502 and 504, all with the body
+  `{"detail": "<message>"}`. It also describes how to get the token (30 seconds, from the
+  Grottocenter API) and the `multipart/form-data` upload. `/health`, `/ready` and `/` work but
+  are not documented.
+
+It names neither the application nor the framework, on purpose: no `server` header (uvicorn
+runs with `--no-server-header`), no framework page, no generated component names, and a
+request that does not match the endpoint gets the same `{"detail": "..."}` body (422) as every
+other error. The page loads Swagger UI from `AI_Serveur/static/swagger-ui` (see its README),
+not from a CDN, and the online validator is turned off, so opening it contacts no other
+host. ReDoc is not offered.
+
+`tests/test_api_documentation.py` fails when the server returns a status that the document
+does not list, so a new error status has to be declared in `AI_Serveur/api_docs.py`.
 
 ## Project architecture
 
