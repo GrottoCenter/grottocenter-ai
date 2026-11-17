@@ -33,6 +33,7 @@ FRONT_ORIGIN=${FRONT_ORIGIN:-https://grottocenter.org}
 SSH_TARGET=${SSH_TARGET:-azureuser@ai-vm.grottocenter.org}
 
 PDF_FILE=""
+MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-60}
 DO_OCR=0
 LOCAL=0
 SSH_KEY=""
@@ -47,7 +48,8 @@ Usage: scripts/smoke_test.sh [--pdf FILE] [--ocr] [--local] [--ssh-logs KEYFILE]
   --ssh-logs KEYFILE  read the server's logs over SSH and check them (section C)
 
 Environment: AI_URL, API_URL, FRONT_ORIGIN, GC_TOKEN (a Grottocenter user token: skips the
-login prompt), SSH_TARGET.
+login prompt), SSH_TARGET, MAX_FILE_SIZE_MB (the server's limit, default 60: the oversized
+upload is 2 MB over it).
 EOF
 }
 
@@ -430,15 +432,15 @@ if acquire_user_jwt; then
 
     # An upload over the limit, refused without being received.
     sso_token documents token
-    dd if=/dev/zero of="$TMP/oversized.pdf" bs=1048576 count=52 2> /dev/null
+    dd if=/dev/zero of="$TMP/oversized.pdf" bs=1048576 count=$((MAX_FILE_SIZE_MB + 2)) 2> /dev/null
     result=$(upload "$TMP/oversized.pdf" "$token" "$TMP/out-big.json" "big.pdf")
     rm -f "$TMP/oversized.pdf"
     code=${result%% *}
     seconds=${result#* }
     if [ "$code" = 413 ] && python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) < 20 else 1)' "$seconds"; then
-      pass "a 52 MB upload is refused" "413 in ${seconds}s"
+      pass "a $((MAX_FILE_SIZE_MB + 2)) MB upload is refused" "413 in ${seconds}s"
     else
-      fail "a 52 MB upload is refused" "HTTP $code in ${seconds}s, expected 413 under 20 s"
+      fail "a $((MAX_FILE_SIZE_MB + 2)) MB upload is refused" "HTTP $code in ${seconds}s, expected 413 under 20 s"
     fi
 
     # The real analysis.

@@ -136,7 +136,7 @@ async def test_oversized_upload_with_a_valid_token_gets_413():
             app, {**bearer(mint()), "Content-Length": str(500 * 1024 * 1024)}
         )
 
-    assert (status, answer["detail"]) == (413, "File too large: the limit is 50 MB")
+    assert (status, answer["detail"]) == (413, "File too large: the limit is 60 MB")
     assert reads == 0
 
 

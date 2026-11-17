@@ -29,8 +29,8 @@ def test_production_defaults_are_the_agreed_limits():
     assert limits.user_daily_limit == 5
     assert limits.user_max_concurrent == 2
     assert limits.global_daily_limit == 200
-    assert limits.max_file_size_mb == 50
-    assert limits.max_file_size_bytes == 52_428_800
+    assert limits.max_file_size_mb == 60
+    assert limits.max_file_size_bytes == 62_914_560
     assert limits.max_pages == 300
     assert limits.max_llm_calls == 10
 

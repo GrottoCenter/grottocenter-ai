@@ -13,7 +13,7 @@
 --     (redirect_to), and with no modification waiting for review.
 --   * A validated PDF file. The size of the file is not in the database: check it before
 --     downloading with  curl -sI <url> | grep -i content-length  (the server refuses
---     anything over 50 MB, and over 300 pages).
+--     anything over 60 MB, and over 300 pages).
 --   * Licences that allow reuse (CC-BY-SA, CC-BY, ODbL, ODC-BY, Licence Ouverte), because
 --     the text of the document is sent to GreenPT. `t_license.is_copyrighted` is not used:
 --     its values do not follow the licence (CC-BY-SA is true, ODbL is false).

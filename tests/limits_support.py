@@ -38,7 +38,7 @@ def make_limits_config(**overrides) -> SimpleNamespace:
         "user_daily_limit": 5,
         "user_max_concurrent": 2,
         "global_daily_limit": 200,
-        "max_file_size_mb": 50,
+        "max_file_size_mb": 60,
         "max_pages": 300,
         "max_llm_calls": 10,
     }

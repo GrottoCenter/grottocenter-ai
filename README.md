@@ -47,7 +47,7 @@ Available `.env` variables:
 | `USER_DAILY_LIMIT` | Analyses one user may start per UTC day (default `5`) | `5` |
 | `USER_MAX_CONCURRENT` | Analyses one user may have running at once (default `2`) | `2` |
 | `GLOBAL_DAILY_LIMIT` | Analyses across all users per UTC day; placeholder until the price of one analysis is known (default `200`) | `200` |
-| `MAX_FILE_SIZE_MB` | Largest accepted upload (default `50`) | `50` |
+| `MAX_FILE_SIZE_MB` | Largest accepted upload (default `60`) | `60` |
 | `MAX_PAGES` | Most pages a PDF may have (default `300`) | `300` |
 | `MAX_LLM_CALLS` | Most model calls one document may need (default `10`) | `10` |
 | `QUOTA_EXEMPT_USER_IDS` | Grottocenter user ids with no daily quota, comma-separated (default empty: nobody) | `1,60181` |
@@ -335,9 +335,9 @@ Grottocenter database (run it on a read-only connection): validated documents wi
 PDF, under a licence that allows reuse (the text goes to GreenPT), of type Book, Issue, Article
 or Report, and not tied to a sensitive massif or entrance (a PDF can contain coordinates). It
 returns a few per type and size class with the title, licence and download URL. The file size
-is not in the database, so check it first with `curl -sI <url>`: the server refuses over 50 MB.
+is not in the database, so check it first with `curl -sI <url>`: the server refuses over 60 MB (`MAX_FILE_SIZE_MB`).
 
-For the capacity check of the VM, `scripts/largest_candidates.sql` lists the 20 longest eligible documents (40 to 300 pages) with the same filters. The file size is again not in the database, so check each URL's `Content-Length` and take the biggest one under 50 MB; the file size, more than the page count, is what loads the server's memory.
+For the capacity check of the VM, `scripts/largest_candidates.sql` lists the 20 longest eligible documents (40 to 300 pages) with the same filters. The file size is again not in the database, so check each URL's `Content-Length` and take the biggest one under 60 MB; the file size, more than the page count, is what loads the server's memory.
 
 | Option | Meaning |
 | --- | --- |
@@ -353,7 +353,7 @@ What it checks:
   to `https`, a missing or forged token gets 401, the CORS preflight is allowed from the front
   and not from another origin, and ports 8000 and 27017 do not answer from outside.
 - **B, with a login:** a token for another product (`superset`) is refused, a text file named
-  `.pdf` gets 415 or 422, a 52 MB upload gets 413, a real PDF is analysed (it prints the
+  `.pdf` gets 415 or 422, an upload just over `MAX_FILE_SIZE_MB` gets 413, a real PDF is analysed (it prints the
   duration, the number of documents and the first title), and the same PDF again returns an
   identical result straight from storage.
 - **C, with `--ssh-logs`:** the last 300 log lines hold no JWT and no `Authorization` header, and

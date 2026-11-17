@@ -11,13 +11,13 @@
 -- 300 pages, MAX_PAGES). The database holds the page range but NOT the size of the file, and
 -- what loads the server's memory is mostly the size (the bytes are held in memory, and a scan
 -- is sent whole to OCR), so check the real sizes before choosing, and keep the server limit
--- of 50 MB in mind:
+-- of 60 MB in mind:
 --
 --   for u in <url> <url> ...; do
 --     printf '%s MB  %s\n' "$(curl -sI "$u" | awk 'tolower($1)=="content-length:" {printf "%.1f", $2/1048576}')" "$u"
 --   done
 --
--- Then analyse the biggest one that is under 50 MB, and, to cover the other kind of load, the
+-- Then analyse the biggest one that is under 60 MB, and, to cover the other kind of load, the
 -- one with the most pages. A very long text PDF is the expensive one in GreenPT calls.
 
 WITH candidates AS (
