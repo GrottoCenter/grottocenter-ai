@@ -337,6 +337,8 @@ or Report, and not tied to a sensitive massif or entrance (a PDF can contain coo
 returns a few per type and size class with the title, licence and download URL. The file size
 is not in the database, so check it first with `curl -sI <url>`: the server refuses over 50 MB.
 
+For the capacity check of the VM, `scripts/largest_candidates.sql` lists the 20 longest eligible documents (40 to 300 pages) with the same filters. The file size is again not in the database, so check each URL's `Content-Length` and take the biggest one under 50 MB; the file size, more than the page count, is what loads the server's memory.
+
 | Option | Meaning |
 | --- | --- |
 | `--pdf FILE` | analyse this document instead of the synthetic one the script generates (new on every run, so each run really analyses) |
