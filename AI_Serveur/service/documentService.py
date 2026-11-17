@@ -17,6 +17,7 @@ from model.DocumentMetadata import DocumentMetadata as DocumentMetadataModel
 from model.GrottocenterType import GrottocenterType
 from model.MongoDocument import MongoDocument
 from repository.mongo import MongoRepository
+from service.analysisAnswer import validate_analysis
 from service.analysisLocks import HashLocks
 from service.documentLlmAnalyzeService import LLMAnalyzerService
 from service.usageService import UsageService
@@ -52,8 +53,16 @@ class DocumentService:
         self.locks = locks if locks is not None else HashLocks()
 
     @staticmethod
+    def page_range(first: int | None, last: int | None) -> str | None:
+        """`3-10`, a single page when only one end is known, or None. Never `None-10`."""
+        if first is not None and last is not None:
+            return f"{first}-{last}"
+        known = first if first is not None else last
+        return None if known is None else str(known)
+
+    @staticmethod
     def map_document_analysis_to_metadata(document_analysis: DocumentAnalyseMetadata | dict) -> list[DocumentMetadataModel]:
-        analysis = DocumentAnalyseMetadata.model_validate(document_analysis)
+        analysis = validate_analysis(document_analysis)
 
         if not analysis.articles:
             return [
@@ -78,7 +87,7 @@ class DocumentService:
                 "grottocenter_type": GrottocenterType.ARTICLE,
                 "identifiers": [],
                 "parent": analysis.title,
-                "pages": f"{article.page_start}-{article.page_end}",
+                "pages": DocumentService.page_range(article.page_start, article.page_end),
             }
             documents.append(DocumentMetadataModel.model_validate(article_metadata))
 

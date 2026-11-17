@@ -1,10 +1,17 @@
-from datetime import date
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from model.GrottocenterType import GrottocenterType
 from model.LicenseName import LicenseName
+from model.PublicationDate import normalize_publication_date
+
+# The JSON schema of the analysis model is embedded in the prompt, so this text is the
+# instruction the language model reads for the field.
+PUBLICATION_DATE_DESCRIPTION = (
+    "Publication date as precise as the document states it, written YYYY, YYYY-MM or "
+    "YYYY-MM-DD. Use null if the document gives no date, and never invent a month or a day."
+)
 
 
 class ArticleMetadata(BaseModel):
@@ -57,9 +64,9 @@ class DocumentAnalyseMetadata(BaseModel):
         description="Publisher or publishing organization.",
     )
 
-    publication_date: Optional[date] = Field(
+    publication_date: Optional[str] = Field(
         default=None,
-        description="Publication date.",
+        description=PUBLICATION_DATE_DESCRIPTION,
     )
     
     identifiers: List[str] = Field(
@@ -104,6 +111,11 @@ class DocumentAnalyseMetadata(BaseModel):
     def convert_null_lists_to_empty_lists(cls, value):
         return [] if value is None else value
 
+    @field_validator("publication_date", mode="before")
+    @classmethod
+    def read_publication_date(cls, value):
+        return normalize_publication_date(value)
+
 class DocumentMetadata(BaseModel):
 
     model_config = ConfigDict(
@@ -126,9 +138,9 @@ class DocumentMetadata(BaseModel):
         description="Publisher or publishing organization.",
     )
 
-    publication_date: Optional[date] = Field(
+    publication_date: Optional[str] = Field(
         default=None,
-        description="Publication date.",
+        description=PUBLICATION_DATE_DESCRIPTION,
     )
     
     identifiers: List[str] = Field(
@@ -175,3 +187,9 @@ class DocumentMetadata(BaseModel):
         default=None,
         description="Pagination or page count.",
     )
+
+    @field_validator("publication_date", mode="before")
+    @classmethod
+    def read_publication_date(cls, value):
+        return normalize_publication_date(value)
+

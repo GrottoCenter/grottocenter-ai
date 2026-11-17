@@ -1,4 +1,4 @@
-from datetime import date
+import pytest
 
 from model.GrottocenterType import GrottocenterType
 from model.LicenseName import LicenseName
@@ -72,7 +72,7 @@ def test_article_documents_share_the_issue_publisher_date_language_and_rights():
 
     for article in articles:
         assert article.publisher == "FFS"
-        assert article.publication_date == date(2024, 3, 1)
+        assert article.publication_date == "2024-03-01"
         assert article.languages == ["fra"]
         assert article.rights == [LicenseName.CC_BY_SA]
         assert article.descriptions == ["Revue de la fédération"]
@@ -86,3 +86,30 @@ def test_null_lists_from_the_llm_become_empty_lists():
     assert result[0].authors == []
     assert result[0].languages == []
     assert result[0].rights == []
+
+
+@pytest.mark.parametrize(
+    ("first", "last", "expected"),
+    [
+        (3, 10, "3-10"),
+        (3, None, "3"),
+        (None, 10, "10"),
+        (None, None, None),
+        (0, 0, "0-0"),
+    ],
+)
+def test_page_range_never_contains_the_word_none(first, last, expected):
+    assert DocumentService.page_range(first, last) == expected
+
+
+def test_an_article_without_page_numbers_gets_no_pages_instead_of_none_none():
+    documents = DocumentService.map_document_analysis_to_metadata(
+        {
+            "title": "Issue 12",
+            "grottocenter_type": "issue",
+            "articles": [{"title": "Without pages", "authors": ["A"], "page_start": None, "page_end": None}],
+        }
+    )
+
+    assert [d.title for d in documents] == ["Issue 12", "Without pages"]
+    assert documents[1].pages is None

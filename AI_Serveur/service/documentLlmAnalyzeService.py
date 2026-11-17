@@ -170,7 +170,8 @@ class LLMAnalyzerService:
                 model=Models.GLM,
             )
 
-            logger.info(
+            # The answer holds the document's title, authors and abstract: only at DEBUG.
+            logger.debug(
                 "Single call response:\n%s",
                 self.format_json_for_log(response),
             )
@@ -195,7 +196,7 @@ class LLMAnalyzerService:
                     max_tokens=2000,
                 )
 
-                logger.info(
+                logger.debug(
                     "Map call response for chunk %s:\n%s",
                     chunk["chunk_id"],
                     self.format_json_for_log(response),
