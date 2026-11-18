@@ -17,31 +17,11 @@ from tests.limits_support import (
     running_app,
     sso_secret,  # noqa: F401 - autouse fixture
 )
-from tracing import JsonFormatter, TraceIdFilter
+from tracing import JsonFormatter
 
 UUID_PATTERN = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 TRACE_A = "0198f3c2-7b1e-7c3a-9d4e-5f6a7b8c9d0e"
 TRACE_B = "0198f3c2-7b1e-7c3a-9d4e-aaaaaaaaaaaa"
-
-
-@pytest.fixture
-def log_lines():
-    """The JSON lines the application logs, as dicts, at INFO."""
-    stream = io.StringIO()
-    handler = logging.StreamHandler(stream)
-    handler.setFormatter(JsonFormatter())
-    handler.addFilter(TraceIdFilter())
-    root = logging.getLogger()
-    previous = root.level
-    root.addHandler(handler)
-    root.setLevel(logging.INFO)
-
-    def lines() -> list[dict]:
-        return [json.loads(line) for line in stream.getvalue().splitlines() if line]
-
-    yield lines
-    root.removeHandler(handler)
-    root.setLevel(previous)
 
 
 async def test_every_response_carries_a_generated_trace_id_when_the_caller_sent_none(respx_mock):

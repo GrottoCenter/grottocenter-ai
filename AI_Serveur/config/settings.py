@@ -166,6 +166,8 @@ class settings:
     cors_origin_regex = os.getenv("CORS_ORIGIN_REGEX", "").strip()
     log_level = os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO"
     analyze_enabled = parse_bool("ANALYZE_ENABLED", True)
+    # The detailed logs of the test phase (logdetails.py). Off unless asked for.
+    log_analysis_details = parse_bool("LOG_ANALYSIS_DETAILS", False)
     user_daily_limit = parse_positive_int("USER_DAILY_LIMIT", DEFAULT_USER_DAILY_LIMIT)
     user_max_concurrent = parse_positive_int(
         "USER_MAX_CONCURRENT", DEFAULT_USER_MAX_CONCURRENT
@@ -293,6 +295,9 @@ def validate_settings(config=settings) -> list[str]:
 
     if not isinstance(getattr(config, "analyze_enabled", True), bool):
         problems.append("ANALYZE_ENABLED must be true or false")
+
+    if not isinstance(getattr(config, "log_analysis_details", False), bool):
+        problems.append("LOG_ANALYSIS_DETAILS must be true or false")
 
     problems.extend(_integer_problems(config))
 

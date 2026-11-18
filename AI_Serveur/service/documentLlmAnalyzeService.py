@@ -4,6 +4,7 @@ import math
 import re
 from typing import Any, TypedDict
 
+import logdetails  # noqa: E402
 from client.GreenPT import Models
 from model.DocumentMetadata import DocumentAnalyseMetadata
 
@@ -141,11 +142,23 @@ class LLMAnalyzerService:
         content = choices[0].get("message", {}).get("content", "") if choices else ""
         match = re.search(r"\{.*\}", content, re.DOTALL)
         if not match:
+            cls._log_raw_answer("The model's answer has no JSON object", content)
             return cls.empty_metadata()
         try:
             return json.loads(match.group(0))
         except json.JSONDecodeError:
+            cls._log_raw_answer("The model's answer is not valid JSON", content)
             return cls.empty_metadata()
+
+    @staticmethod
+    def _log_raw_answer(message: str, content: str) -> None:
+        """With LOG_ANALYSIS_DETAILS: what the model actually wrote, cut."""
+        if not logdetails.enabled():
+            return
+        text, truncated = logdetails.cut(content, logdetails.RAW_ANSWER_CHARACTERS)
+        logger.warning(
+            message, extra={"raw_answer": text, "raw_answer_truncated": truncated}
+        )
 
     @staticmethod
     def aggregate_usage(*responses: dict[str, Any]) -> dict[str, int]:

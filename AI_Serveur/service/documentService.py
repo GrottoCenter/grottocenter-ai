@@ -10,6 +10,7 @@ import fitz
 from fastapi import HTTPException, UploadFile
 from pymongo.errors import BulkWriteError, DuplicateKeyError
 
+import logdetails
 from config.settings import UsageLimits
 from errors import EmptyUploadError, NoTextError
 from model.DocumentMetadata import DocumentAnalyseMetadata
@@ -106,6 +107,7 @@ class DocumentService:
             )
 
         file_content = await self._read_upload(file)
+        self._log_request(caller_id, file, file_content)
         if len(file_content) == 0:
             raise EmptyUploadError()
         await asyncio.to_thread(self._validate_pdf, file_content)
@@ -117,6 +119,7 @@ class DocumentService:
         stored = await self._stored_result(file_hash)
         if stored:
             self._log_analysis(caller_id, file_hash, file_content, started, source="storage")
+            self._log_result(stored["document_metadata"], "storage")
             return stored
 
         # One analysis per file at a time. A request for a file that is being analysed waits
@@ -129,6 +132,7 @@ class DocumentService:
                 self._log_analysis(
                     caller_id, file_hash, file_content, started, source="storage"
                 )
+                self._log_result(stored["document_metadata"], "storage")
                 return stored
 
             metered = self.usage.metered(caller_id) if self.usage else nullcontext()
@@ -168,12 +172,14 @@ class DocumentService:
             # Another instance stored this file while this one was analysing it (the lock
             # only covers one process). Its result is what everybody is given.
             self._log_analysis(caller_id, file_hash, file_content, started, source="storage")
+            self._log_result(raced["document_metadata"], "storage")
             return raced
 
         logger.info("Processing document file %s", unique_filename)
         self._log_analysis(
             caller_id, file_hash, file_content, started, source="analyzed"
         )
+        self._log_result(document_metadata, "analyzed")
 
         return {
             "message": "success", 
@@ -316,6 +322,41 @@ class DocumentService:
         ):
             return 1
         return len(LLMAnalyzerService.build_chunks(document_text)) + 1
+
+    @staticmethod
+    def _log_request(caller_id, file: UploadFile, file_content: bytes) -> None:
+        """With LOG_ANALYSIS_DETAILS: the original file name and size of the upload.
+
+        The name is the client's, cleaned and cut (logdetails.clean_file_name). Nothing
+        else in the application reads it: the server names the stored file itself.
+        """
+        if not logdetails.enabled():
+            return
+        logger.info(
+            "analysis request caller=%s",
+            caller_id,
+            extra={
+                "file_name": logdetails.clean_file_name(file.filename),
+                "file_size_bytes": len(file_content),
+                "content_type": file.content_type,
+            },
+        )
+
+    @staticmethod
+    def _log_result(documents, source: str) -> None:
+        """With LOG_ANALYSIS_DETAILS: the metadata that is returned to the caller."""
+        if not logdetails.enabled():
+            return
+        payload = [
+            document.model_dump(mode="json") if hasattr(document, "model_dump") else document
+            for document in documents
+        ]
+        text, truncated = logdetails.as_json_text(payload, logdetails.RESULT_CHARACTERS)
+        logger.info(
+            "analysis result documents=%d",
+            len(payload),
+            extra={"source": source, "result_json": text, "result_truncated": truncated},
+        )
 
     @staticmethod
     def _log_analysis(

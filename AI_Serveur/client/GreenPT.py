@@ -4,6 +4,7 @@ from typing import Any
 
 import httpx
 
+import logdetails
 from errors import UpstreamError, UpstreamTimeoutError
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,8 @@ class ReasoningEffort(enum.Enum):
     HIGH = "high"
 
 
-# What of a GreenPT answer is kept in the log. The answer is not shown to the caller.
+# What of a GreenPT answer is kept in the log (more with LOG_ANALYSIS_DETAILS). The answer is
+# not shown to the caller.
 LOGGED_BODY_CHARACTERS = 500
 
 
@@ -29,7 +31,11 @@ def _fail(operation: str, reason: str, response: httpx.Response | None = None) -
             operation,
             reason,
             response.status_code,
-            response.text[:LOGGED_BODY_CHARACTERS],
+            response.text[
+                : logdetails.UPSTREAM_BODY_CHARACTERS
+                if logdetails.enabled()
+                else LOGGED_BODY_CHARACTERS
+            ],
         )
     else:
         logger.error("GreenPT %s failed: %s", operation, reason)

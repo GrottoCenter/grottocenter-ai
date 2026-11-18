@@ -44,6 +44,7 @@ Available `.env` variables:
 | `FORWARDED_ALLOW_IPS` | Proxies whose `X-Forwarded-For` uvicorn trusts; read by uvicorn itself (default `127.0.0.1,::1`) | `127.0.0.1` |
 | `AI_SERVER_PORT` | Host port the compose files publish the API on (default `8000`) | `8000` |
 | `ANALYZE_ENABLED` | Kill switch: `false` makes `POST /documents/analyze` answer 503 without redeploying (default `true`) | `true` |
+| `LOG_ANALYSIS_DETAILS` | Detailed logs for the test phase (see "Logs and the trace id"): original file name, returned metadata, raw model answer. Keep `false` once the front end is live | `false` |
 | `USER_DAILY_LIMIT` | Analyses one user may start per UTC day (default `5`) | `5` |
 | `USER_MAX_CONCURRENT` | Analyses one user may have running at once (default `2`) | `2` |
 | `GLOBAL_DAILY_LIMIT` | Analyses across all users per UTC day; placeholder until the price of one analysis is known (default `200`) | `200` |
@@ -466,6 +467,26 @@ the refusals (401, 413) and the CORS preflight:
 - the intent is that the front sends the same id on its calls to the Grottocenter API and to
   this server, so that one search for it finds what each side did for one user action. The
   API already honours `X-Trace-Id` and logs it as `traceId`.
+
+**Detailed logs (test phase).** With `LOG_ANALYSIS_DETAILS=true` the log also holds what
+normally stays out of it because it comes from the users' documents, as separate JSON fields:
+
+- `analysis request caller=<id>`: `file_name` (the client's name, with control characters
+  replaced and cut to 200 characters; nothing else in the application reads it), `file_size_bytes`,
+  `content_type`. It is written for every upload whose body is read, including the ones that are
+  then refused (415, 422);
+- `analysis result documents=<n>`: `source` (`analyzed` or `storage`), `result_json` (the metadata
+  returned, as JSON text, cut to 5,000 characters with `result_truncated`);
+- a warning with `raw_answer` (cut to 2,000 characters) when the model's answer has no usable JSON
+  or fields had to be dropped;
+- the body of a GreenPT error, 2,000 characters instead of 500.
+
+The limits are small on purpose: a line travels through the VM's rsyslog, which cuts a message
+over 8 KB, and a cut JSON line cannot be read.
+
+With the variable off, none of that is logged. The titles, authors and descriptions in these
+lines come from the users' documents: turn it off before real traffic, and remember that the lines
+stay as long as the log table does.
 
 The CORS settings allow that request header and expose `X-Trace-Id` and `Retry-After` to the
 browser (without it a script cannot read how long to wait after a 429 or a 503).

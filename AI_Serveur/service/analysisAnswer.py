@@ -4,7 +4,8 @@ The model is asked for a JSON object that fits the schema of DocumentAnalyseMeta
 it mostly does. When one field does not fit (a licence name that is not in the list, a
 list where a string is expected), the rest of the answer is still good, and was paid for.
 So the fields that do not fit are dropped, the rest is kept, and the names of the dropped
-fields (never their values, which are document text) are logged. An answer that cannot be
+fields are logged, never their values, which are document text (unless LOG_ANALYSIS_DETAILS
+is on, for the test phase: then the whole answer is logged too). An answer that cannot be
 repaired is an upstream failure (502), not a server error.
 """
 
@@ -14,6 +15,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+import logdetails
 from errors import UpstreamError
 from model.DocumentMetadata import DocumentAnalyseMetadata
 
@@ -31,9 +33,14 @@ def validate_analysis(raw: Any) -> DocumentAnalyseMetadata:
     except ValidationError as error:
         repaired, dropped = _drop_invalid_fields(raw, error)
 
+    extra = {}
+    if logdetails.enabled():
+        text, truncated = logdetails.as_json_text(raw, logdetails.RAW_ANSWER_CHARACTERS)
+        extra = {"raw_answer": text, "raw_answer_truncated": truncated}
     logger.warning(
         "The model's answer had fields that do not fit the schema, dropped: %s",
         ", ".join(sorted(dropped)),
+        extra=extra,
     )
     try:
         return DocumentAnalyseMetadata.model_validate(repaired)

@@ -16,6 +16,8 @@ import uuid
 from contextvars import ContextVar
 from datetime import datetime, timezone
 
+from logdetails import details_enabled
+
 TRACE_HEADER = "X-Trace-Id"
 _TRACE_HEADER_BYTES = TRACE_HEADER.lower().encode()
 
@@ -49,7 +51,21 @@ class TraceIdFilter(logging.Filter):
 class JsonFormatter(logging.Formatter):
     """One JSON object per line, so that a log collector never splits a traceback."""
 
-    EXTRA_FIELDS = ("http_method", "http_path", "http_status", "duration_ms")
+    EXTRA_FIELDS = (
+        "http_method",
+        "http_path",
+        "http_status",
+        "duration_ms",
+        # The detailed logs (logdetails.py)
+        "file_name",
+        "file_size_bytes",
+        "content_type",
+        "source",
+        "result_json",
+        "result_truncated",
+        "raw_answer",
+        "raw_answer_truncated",
+    )
 
     def format(self, record: logging.LogRecord) -> str:
         line = {
@@ -89,6 +105,8 @@ class TraceIdMiddleware:
         incoming = dict(scope["headers"]).get(_TRACE_HEADER_BYTES)
         trace_id = read_trace_id(incoming.decode("latin-1") if incoming else None)
         current_trace_id.set(trace_id)
+        config = getattr(getattr(scope.get("app"), "state", None), "config", None)
+        details_enabled.set(getattr(config, "log_analysis_details", False) is True)
         started = time.perf_counter()
         status = 0
 

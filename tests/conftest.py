@@ -1,4 +1,6 @@
 import io
+import json
+import logging
 from typing import Any
 
 import fitz
@@ -9,6 +11,7 @@ from starlette.datastructures import Headers
 
 from repository.mongo import MongoRepository
 from service.documentService import DocumentService
+from tracing import JsonFormatter, TraceIdFilter
 
 ISSUE_ANALYSIS: dict[str, Any] = {
     "title": "Spelunca 12",
@@ -113,3 +116,23 @@ def fake_analyzer() -> FakeAnalyzer:
 @pytest.fixture
 def service(fake_analyzer, mongo_repository) -> DocumentService:
     return DocumentService(fake_analyzer, mongo_repository)
+
+
+@pytest.fixture
+def log_lines():
+    """The JSON lines the application logs, as dicts, at INFO."""
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    handler.addFilter(TraceIdFilter())
+    root = logging.getLogger()
+    previous = root.level
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+
+    def lines() -> list[dict]:
+        return [json.loads(line) for line in stream.getvalue().splitlines() if line]
+
+    yield lines
+    root.removeHandler(handler)
+    root.setLevel(previous)
