@@ -89,6 +89,16 @@ ANALYZE_EXAMPLE: dict[str, Any] = {
     ],
 }
 
+TRACE_ID_HEADER = {
+    "X-Trace-Id": {
+        "description": (
+            "Identifier of this request, to quote in a report. Send your own as a UUID in the "
+            "request header of the same name to follow one user action across services."
+        ),
+        "schema": {"type": "string", "format": "uuid"},
+    }
+}
+
 RETRY_AFTER = {
     "Retry-After": {
         "description": "Seconds to wait before trying again.",
@@ -97,14 +107,19 @@ RETRY_AFTER = {
 }
 
 
-def _error(description: str, **extra: Any) -> dict[str, Any]:
-    return {"model": ErrorResponse, "description": description, **extra}
+def _error(description: str, headers: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "model": ErrorResponse,
+        "description": description,
+        "headers": {**TRACE_ID_HEADER, **(headers or {})},
+    }
 
 
 ANALYZE_RESPONSES: dict[int | str, dict[str, Any]] = {
     200: {
         "model": AnalyzeResponse,
         "description": "The metadata of the document.",
+        "headers": TRACE_ID_HEADER,
         "content": {"application/json": {"example": ANALYZE_EXAMPLE}},
     },
     401: _error("The token is missing, malformed, expired, or was issued for another product."),

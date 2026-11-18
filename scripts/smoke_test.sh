@@ -327,6 +327,16 @@ else
   pass "no server header" "none sent"
 fi
 
+# Every answer carries a trace id: a UUID sent by the caller is kept, otherwise one is made.
+probe_id=$(python3 -c 'import uuid; print(uuid.uuid4())')
+echoed=$(curl -sS -D - -o /dev/null --max-time 20 -H "X-Trace-Id: $probe_id" "$AI_URL/health" 2> /dev/null | tr -d '\r' | awk -F': ' 'tolower($1)=="x-trace-id" {print $2}')
+generated=$(curl -sS -D - -o /dev/null --max-time 20 "$AI_URL/health" 2> /dev/null | tr -d '\r' | awk -F': ' 'tolower($1)=="x-trace-id" {print $2}')
+if [ "$echoed" = "$probe_id" ] && printf '%s' "$generated" | grep -qE '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'; then
+  pass "trace id on every answer" "kept when sent, generated when not"
+else
+  fail "trace id on every answer" "sent $probe_id, got '${echoed:-none}'; without one got '${generated:-none}'"
+fi
+
 # The public documentation: the document and the page name neither the application nor
 # the framework, and the page loads its files from this server only.
 docs_bad=""
@@ -546,6 +556,10 @@ unset token
 # ---------------------------------------------------------------------------------------
 if [ -n "$SSH_KEY" ]; then
   section "C. Server logs (SSH)"
+  # A request with a known trace id that matches no route: it must show up in the logs with that id.
+  log_probe_id=$(python3 -c 'import uuid; print(uuid.uuid4())')
+  curl -sS -o /dev/null --max-time 20 -H "X-Trace-Id: $log_probe_id" "$AI_URL/smoke-test-log-probe" 2> /dev/null || true
+  sleep 1
   logs=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
     -o ConnectTimeout=15 "$SSH_TARGET" 'docker logs --tail 300 ai-server 2>&1' 2> /dev/null)
   ssh_status=$?
@@ -558,6 +572,12 @@ if [ -n "$SSH_KEY" ]; then
       pass "no token in the last 300 log lines" "no JWT-shaped string, no Authorization header"
     else
       fail "no token in the last 300 log lines" "$jwt_lines JWT-shaped line(s), $auth_lines Authorization line(s)"
+    fi
+
+    if printf '%s\n' "$logs" | grep "$log_probe_id" | grep -q '"http_status": 404'; then
+      pass "a request is logged with its trace id" "$log_probe_id found with its status"
+    else
+      fail "a request is logged with its trace id" "$log_probe_id not found in the last 300 log lines"
     fi
 
     printf '%s\n' "$logs" | grep 'analysis caller=' | tail -n 6 | while IFS= read -r line; do info "${line#*analysis }"; done

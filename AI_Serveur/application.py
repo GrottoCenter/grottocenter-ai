@@ -28,17 +28,17 @@ from lifespan import build_lifespan
 from middleware import MaxBodySizeMiddleware, RequireValidTokenMiddleware
 from service.analysisLocks import HashLocks
 from service.usageService import ConcurrencyLimiter
+from tracing import TRACE_HEADER, JsonFormatter, TraceIdFilter, TraceIdMiddleware
 
 logger = logging.getLogger(__name__)
 
 
-def configure_logging(level_name: str) -> None:
-    logging.basicConfig(
-        level=resolve_log_level(level_name),
-        stream=sys.stdout,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        force=True,
-    )
+def configure_logging(level_name: str, stream=None) -> None:
+    """One JSON object per line on stdout, each with the trace id of its request."""
+    handler = logging.StreamHandler(stream or sys.stdout)
+    handler.setFormatter(JsonFormatter())
+    handler.addFilter(TraceIdFilter())
+    logging.basicConfig(level=resolve_log_level(level_name), handlers=[handler], force=True)
 
 
 def create_app(config=settings, mongo_client_factory=pymongo.MongoClient) -> FastAPI:
@@ -89,8 +89,15 @@ def create_app(config=settings, mongo_client_factory=pymongo.MongoClient) -> Fas
         ),
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", TRACE_HEADER],
+        # What a browser may read from an answer: the trace id to quote in a report, and
+        # how long to wait after a 429 or a 503.
+        expose_headers=[TRACE_HEADER, "Retry-After"],
     )
+
+    # Outermost, so that every answer carries the trace id, including the refusals that the
+    # middlewares above send and the CORS preflight.
+    app.add_middleware(TraceIdMiddleware)
 
     @app.get("/", include_in_schema=False)
     async def root():

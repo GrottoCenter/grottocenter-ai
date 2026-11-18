@@ -14,7 +14,7 @@ services:
     build: ./AI_Serveur
     image: ai-server:dev
     # Same command as the image, plus --reload for the mounted source.
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--no-server-header", "--reload", "--reload-dir", "/app"]
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--no-server-header", "--no-access-log", "--reload", "--reload-dir", "/app"]
     environment:
       - GREENPT_API_URL=${GREENPT_API_URL:-https://api.greenpt.ai/v1}
       - GREENPT_API_KEY=${GREENPT_API_KEY:?Set GREENPT_API_KEY in .env}

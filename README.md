@@ -448,6 +448,28 @@ host. ReDoc is not offered.
 `tests/test_api_documentation.py` fails when the server returns a status that the document
 does not list, so a new error status has to be declared in `AI_Serveur/api_docs.py`.
 
+### Logs and the trace id
+
+The server writes one JSON object per line on stdout: `timestamp`, `level`, `logger`, `message`,
+`trace_id`, and for the line written when a request is answered (`logger` is `request`)
+`http_method`, `http_path`, `http_status` and `duration_ms`. A traceback is in the `exception`
+field of its line, never on several lines. The query string, the `Authorization` header and the
+file content are not logged. The probes (`/health`, `/ready`) are logged at DEBUG only.
+
+Every request has a trace id, returned in the `X-Trace-Id` header of its answer, including
+the refusals (401, 413) and the CORS preflight:
+
+- a caller may send its own as a UUID in the `X-Trace-Id` request header; anything that is not
+  a UUID is ignored and replaced, never copied into the logs;
+- every log line written while the request is handled carries it, whichever request runs at
+  the same time;
+- the intent is that the front sends the same id on its calls to the Grottocenter API and to
+  this server, so that one search for it finds what each side did for one user action. The
+  API already honours `X-Trace-Id` and logs it as `traceId`.
+
+The CORS settings allow that request header and expose `X-Trace-Id` and `Retry-After` to the
+browser (without it a script cannot read how long to wait after a 429 or a 503).
+
 ## Project architecture
 
 ```text
