@@ -476,7 +476,9 @@ normally stays out of it because it comes from the users' documents, as separate
   `content_type`. It is written for every upload whose body is read, including the ones that are
   then refused (415, 422);
 - `analysis result documents=<n>`: `source` (`analyzed` or `storage`), `result_json` (the metadata
-  returned, as JSON text, cut to 5,000 characters with `result_truncated`);
+  returned, as JSON text). When it does not fit in 5,000 characters, `result_json` holds only the
+  `title`, `grottocenter_type` and `pages` of each document and `result_compact` is true (an issue
+  and its articles stay readable); it is cut, with `result_truncated`, only if that is still too long;
 - a warning with `raw_answer` (cut to 2,000 characters) when the model's answer has no usable JSON
   or fields had to be dropped;
 - the body of a GreenPT error, 2,000 characters instead of 500.

@@ -62,6 +62,7 @@ class JsonFormatter(logging.Formatter):
         "content_type",
         "source",
         "result_json",
+        "result_compact",
         "result_truncated",
         "raw_answer",
         "raw_answer_truncated",

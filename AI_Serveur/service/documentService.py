@@ -351,11 +351,16 @@ class DocumentService:
             document.model_dump(mode="json") if hasattr(document, "model_dump") else document
             for document in documents
         ]
-        text, truncated = logdetails.as_json_text(payload, logdetails.RESULT_CHARACTERS)
+        text, compact, truncated = logdetails.result_for_log(payload)
         logger.info(
             "analysis result documents=%d",
             len(payload),
-            extra={"source": source, "result_json": text, "result_truncated": truncated},
+            extra={
+                "source": source,
+                "result_json": text,
+                "result_compact": compact,
+                "result_truncated": truncated,
+            },
         )
 
     @staticmethod

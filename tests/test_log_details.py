@@ -102,17 +102,6 @@ async def test_a_refused_file_still_has_its_name_in_the_log(log_lines):
     assert [line["file_name"] for line in request_lines] == ["notes de terrain.pdf"]
 
 
-async def test_a_long_answer_is_cut_and_says_so(respx_mock, log_lines):
-    long_description = "x" * 30000
-    respx_mock.post(CHAT_URL).respond(json=chat_reply(json.dumps({"title": "T", "descriptions": [long_description]})))
-    async with running_app(make_limits_config(log_analysis_details=True)) as (_app, client):
-        await upload(client, distinct_pdf(1))
-
-    [line] = [item for item in detail_lines(log_lines()) if item["message"].startswith("analysis result")]
-    assert line["result_truncated"] is True
-    assert len(line["result_json"]) == RESULT_CHARACTERS
-
-
 # --- the name is cleaned -------------------------------------------------------------------
 
 
@@ -227,3 +216,55 @@ async def test_the_biggest_detailed_line_stays_under_the_size_rsyslog_accepts(re
                 setattr(record, key, value)
         sizes.append(len(formatter.format(record).encode()))
     assert max(sizes) < 8192
+
+
+# --- an answer that does not fit is shown in a shorter form that can still be read --------
+
+
+def many_articles(count: int) -> str:
+    articles = [
+        {"title": f"Article numéro {number}", "authors": ["A. Martin"], "page_start": number, "page_end": number + 1}
+        for number in range(1, count + 1)
+    ]
+    return json.dumps(
+        {
+            "title": "Numéro spécial",
+            "grottocenter_type": "issue",
+            "descriptions": ["Un long résumé du numéro. " * 40],
+            "articles": articles,
+        }
+    )
+
+
+async def test_an_answer_too_long_for_one_line_is_logged_as_titles_and_stays_readable(respx_mock, log_lines):
+    respx_mock.post(CHAT_URL).respond(json=chat_reply(many_articles(18)))
+    async with running_app(make_limits_config(log_analysis_details=True)) as (_app, client):
+        response = await upload(client, distinct_pdf(1))
+
+    [line] = [item for item in detail_lines(log_lines()) if item["message"].startswith("analysis result")]
+    shown = json.loads(line["result_json"])  # fails if the text was cut in the middle
+    assert response.status_code == 200
+    assert line["result_compact"] is True and line["result_truncated"] is False
+    assert len(shown) == 19  # the issue and its 18 articles, none dropped
+    assert [item["title"] for item in shown[1:4]] == ["Article numéro 1", "Article numéro 2", "Article numéro 3"]
+    assert set(shown[0]) == {"title", "grottocenter_type", "pages"}
+
+
+async def test_an_answer_that_fits_is_logged_whole(respx_mock, log_lines):
+    respx_mock.post(CHAT_URL).respond(json=chat_reply('{"title": "Court", "descriptions": ["Un résumé."]}'))
+    async with running_app(make_limits_config(log_analysis_details=True)) as (_app, client):
+        await upload(client, distinct_pdf(1))
+
+    [line] = [item for item in detail_lines(log_lines()) if item["message"].startswith("analysis result")]
+    assert line["result_compact"] is False
+    assert json.loads(line["result_json"])[0]["descriptions"] == ["Un résumé."]
+
+
+async def test_even_the_short_form_is_cut_when_there_are_hundreds_of_documents(respx_mock, log_lines):
+    respx_mock.post(CHAT_URL).respond(json=chat_reply(many_articles(400)))
+    async with running_app(make_limits_config(log_analysis_details=True)) as (_app, client):
+        await upload(client, distinct_pdf(1))
+
+    [line] = [item for item in detail_lines(log_lines()) if item["message"].startswith("analysis result")]
+    assert (line["result_compact"], line["result_truncated"]) == (True, True)
+    assert len(line["result_json"]) == RESULT_CHARACTERS

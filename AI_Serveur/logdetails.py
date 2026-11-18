@@ -50,3 +50,23 @@ def cut(text: str, limit: int) -> tuple[str, bool]:
 
 def as_json_text(value: Any, limit: int) -> tuple[str, bool]:
     return cut(json.dumps(value, ensure_ascii=False, default=str), limit)
+
+
+# What identifies a document when the whole answer does not fit in a line: an issue with many
+# articles repeats the same long description for each of them.
+COMPACT_FIELDS = ("title", "grottocenter_type", "pages")
+
+
+def result_for_log(documents: list[dict]) -> tuple[str, bool, bool]:
+    """The answer as JSON text for one log line: (text, compact, truncated).
+
+    The whole answer when it fits. Otherwise only the identifying fields of each document,
+    which keeps the text valid JSON for the usual case (an issue and its articles). Only an
+    answer that is too long even in that form is cut, and then it says so.
+    """
+    text, truncated = as_json_text(documents, RESULT_CHARACTERS)
+    if not truncated:
+        return text, False, False
+    short = [{field: document.get(field) for field in COMPACT_FIELDS} for document in documents]
+    text, truncated = as_json_text(short, RESULT_CHARACTERS)
+    return text, True, truncated
