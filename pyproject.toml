@@ -3,8 +3,6 @@
 line-length = 88
 # Match the Python version of AI_Serveur/Dockerfile.
 target-version = "py313"
-# `old/` is the previous Streamlit app, kept for reference only.
-extend-exclude = ["old"]
 # The code uses top-level imports (`from client.GreenPT import ...`), so AI_Serveur/ is the source root.
 src = ["AI_Serveur", "."]
 
