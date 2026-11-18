@@ -239,3 +239,28 @@ def test_uvicorn_does_not_write_its_own_access_log_which_has_no_trace_id(path, p
     from tests.test_no_framework_fingerprint import ROOT, command_of
 
     assert "--no-access-log" in command_of(Path(ROOT) / path, pattern)
+
+
+async def test_last_resort_500_outside_the_analysis_route_carries_the_trace_id_of_its_log_line(log_lines):
+    import httpx
+
+    from application import create_app
+    from tests.limits_support import SharedMongo, make_limits_config
+
+    app = create_app(make_limits_config(), SharedMongo())
+
+    @app.get("/boom")
+    async def boom():
+        raise RuntimeError("kaboom detail")
+
+    async with app.router.lifespan_context(app):
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            sent = await client.get("/boom", headers={"X-Trace-Id": TRACE_A})
+            generated = await client.get("/boom")
+
+    assert (sent.status_code, generated.status_code) == (500, 500)
+    assert sent.headers["x-trace-id"] == TRACE_A
+    assert UUID_PATTERN.match(generated.headers["x-trace-id"])
+    failures = [line for line in log_lines() if line["logger"] == "errors" and line["level"] == "ERROR"]
+    assert {line["trace_id"] for line in failures} == {TRACE_A, generated.headers["x-trace-id"]}

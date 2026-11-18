@@ -11,6 +11,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from tracing import TRACE_HEADER, current_trace_id
+
 logger = logging.getLogger(__name__)
 
 UPSTREAM_FAILED_MESSAGE = "The analysis service failed. Try again later."
@@ -90,6 +92,11 @@ def install_error_handlers(app: FastAPI) -> None:
         # Safety net for what happens outside the analysis route (which has its own, see
         # documentController). Starlette runs this one outside the CORS middleware.
         logger.error("Unhandled error on %s", request.url.path, exc_info=error)
+        # This handler runs outside every middleware, so the trace id is not added to the
+        # answer for it: it is put here, from the same variable the log line reads.
+        trace_id = current_trace_id.get()
         return JSONResponse(
-            status_code=500, content={"detail": INTERNAL_ERROR_MESSAGE}
+            status_code=500,
+            content={"detail": INTERNAL_ERROR_MESSAGE},
+            headers={TRACE_HEADER: trace_id} if trace_id else None,
         )
