@@ -17,8 +17,8 @@ class DocumentChunk(TypedDict):
 
 class LLMAnalyzerService:
 
-    SINGLE_CALL_TOKEN_LIMIT = 800_000
-    MAP_CHUNK_TOKEN_BUDGET = 400_000
+    SINGLE_CALL_TOKEN_LIMIT = 70_000
+    MAP_CHUNK_TOKEN_BUDGET = 50_000
 
     SCHEMA_BLOCK = json.dumps(
         DocumentAnalyseMetadata.model_json_schema(),
@@ -180,7 +180,7 @@ class LLMAnalyzerService:
             response = await self.greenpt_client.call_greenpt_chat(
                 document_text,
                 system_prompt=self.REDUCE_SYSTEM_PROMPT,
-                model=Models.GLM,
+                model=Models.DEFAULT,
             )
 
             # The answer holds the document's title, authors and abstract: only at DEBUG.
@@ -205,7 +205,7 @@ class LLMAnalyzerService:
                 response = await self.greenpt_client.call_greenpt_chat(
                     prompt,
                     system_prompt=self.MAP_SYSTEM_PROMPT,
-                    model=Models.GLM,
+                    model=Models.DEFAULT,
                     max_tokens=2000,
                 )
 
@@ -226,7 +226,7 @@ class LLMAnalyzerService:
             reduce_response = await self.greenpt_client.call_greenpt_chat(
                 reduce_prompt,
                 system_prompt=self.REDUCE_SYSTEM_PROMPT,
-                model=Models.GLM,
+                model=Models.DEFAULT,
             )
             responses.append(reduce_response)
             result = self.parse_json_response(reduce_response)

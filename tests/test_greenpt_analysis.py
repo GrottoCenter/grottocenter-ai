@@ -38,7 +38,7 @@ async def test_text_pdf_triggers_one_chat_call_with_the_expected_request_and_par
     assert chat.call_count == 1
     assert not ocr.called
     body = httpx.Response(200, content=chat.calls[0].request.content).json()
-    assert body["model"] == "glm-5.3-flash"
+    assert body["model"] == "mistral-small-3.2-24b-instruct-2506"
     assert body["temperature"] == 0
     assert body["stream"] is False
     assert body["messages"][0]["role"] == "system"

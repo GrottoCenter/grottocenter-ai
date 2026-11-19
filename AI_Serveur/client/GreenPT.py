@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 class Models(enum.Enum):
     GLM = "glm-5.3-flash"
+    MISTRAL_SMALL = "mistral-small-3.2-24b-instruct-2506"
+    DEFAULT = MISTRAL_SMALL
 
 class ReasoningEffort(enum.Enum):
     LOW = "low"
